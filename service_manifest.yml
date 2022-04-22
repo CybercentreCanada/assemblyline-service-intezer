@@ -1,0 +1,42 @@
+name: IntezerStatic
+version: 4.2.0.stable1
+description: Fetch the Intezer results of the submitted file's sha256
+
+accepts: .*
+rejects: empty|metadata/.*
+
+stage: CORE
+category: External
+
+file_required: true
+timeout: 60
+disable_cache: false
+
+enabled: false
+is_external: true
+licence_count: 0
+
+config:
+  # Don't forget the /api/ at the end of the URL!
+  base_url: https://analyze.intezer.com/api/
+  api_version: v2-0
+  api_key: sample_api_key
+  private_only: false
+
+heuristics:
+  - heur_id: 1
+    name: File is malicious
+    score: 1000
+    filetype: .*
+    description: Intezer considers this file malicious
+  - heur_id: 2
+    name: File is suspicious
+    score: 500
+    filetype: .*
+    description: Intezer considers this file suspicious
+
+docker_config:
+  image: ghcr.io/nvisosecurity/assemblyline-service-intezer:main
+  cpu_cores: 1
+  ram_mb: 256
+  allow_internet_access: true
