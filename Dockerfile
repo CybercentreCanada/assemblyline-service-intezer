@@ -1,6 +1,6 @@
 FROM cccs/assemblyline-v4-service-base:stable
 
-ENV SERVICE_PATH intezer_static.IntezerStatic
+ENV SERVICE_PATH intezer_dynamic.IntezerDynamic
 
 USER root
 
@@ -8,9 +8,7 @@ RUN apt-get update
 
 USER assemblyline
 
-# RUN pip install intezer-sdk
-# Using fork temporarily while https://github.com/intezer/analyze-python-sdk/issues/35 and https://github.com/intezer/analyze-python-sdk/issues/39 are open
-RUN pip install --no-cache-dir --user git+https://github.com/cccs-kevin/analyze-python-sdk && rm -rf ~/.cache/pip
+RUN pip install intezer-sdk && rm -rf ~/.cache/pip
 
 WORKDIR /opt/al_service
 COPY . .

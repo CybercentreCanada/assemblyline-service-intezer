@@ -1,7 +1,9 @@
-# IntezerStatic service
-This repository is an Assemblyline service that fetches the Intezer report for the SHA256 of a submitted file.
+# IntezerDynamic service
+This repository is an Assemblyline service that fetches the Intezer report for the SHA256 of a submitted file, and if the SHA256 was not found on the Intezer instance, then this service will submit that file.
 
 **NOTE**: This service **requires** you to have your own API key (Paid or Free). It is **not** preinstalled during a default installation.
+
+**NOTE**: This service **requires** extensive setup prior to installation if you are deploying your own instance of IntezerAnalyze.
 
 ## Execution
 
