@@ -21,3 +21,7 @@ If you are using Intezer's Dynamic Execution module, then set the service timeou
 * **api_version**: This service has only been tested with `v2-0`.
 * **api_key**: This is the 36 character key provided to you by [Intezer](https://www.intezer.com/blog/malware-analysis/api-intezer-analyze-community/).
 * **private_only**: This is a flag that will only return private submissions on the Intezer Analyze system, if selected.
+* **is_on_premise**: This is a flag used for indicating if the Intezer Analyze system is on-premise, rather than the cloud API.
+
+### Submission Parameters
+* **analysis_id**: This is the analysis ID of an analysis that is already on the system. The cloud API counts retrieving the analysis by file hash as a "File Scan" which counts towards an account's monthly quota. We can circumvent this by submitting the analysis ID of an analysis. That being said, this will ignore the file that you submit to Assemblyline.

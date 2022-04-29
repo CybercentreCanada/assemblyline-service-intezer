@@ -24,6 +24,12 @@ config:
   private_only: false
   is_on_premise: false
 
+submission_params:
+  - default: ""
+    name: analysis_id
+    type: str
+    value: ""
+
 heuristics:
   - heur_id: 1
     name: File is malicious
@@ -70,7 +76,11 @@ heuristics:
     score: 0
     filetype: .*
     description: Intezer raised a signature
-
+  - heur_id: 11
+    name: Collection
+    score: 0
+    filetype: .*
+    description: Intezer raised a signature
 
 docker_config:
   image: ghcr.io/nvisosecurity/assemblyline-service-intezer:main

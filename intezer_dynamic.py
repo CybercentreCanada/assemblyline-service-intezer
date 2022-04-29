@@ -1,10 +1,11 @@
-from ipaddress import ip_address, ip_network, IPv4Network
+from ipaddress import ip_address
 import json
 import re
 from requests import HTTPError
 from typing import Any, Dict, List, Optional, Union
 
 from intezer_sdk.api import IntezerApi
+from intezer_sdk.errors import UnsupportedOnPremiseVersion
 from intezer_sdk.consts import OnPremiseVersion, BASE_URL, API_VERSION
 from signatures import get_attack_ids_for_signature_name, get_heur_id_for_signature_name, GENERIC_HEURISTIC_ID
 
@@ -37,7 +38,6 @@ UNINTERESTING_ANALYSIS_KEYS = [
     "is_private",
     "sha256",
     "verdict",
-    "analysis_id",
     "family_id",
 ]
 UNINTERESTING_SUBANALYSIS_KEYS = [
@@ -77,6 +77,12 @@ TTP_SEVERITY_TRANSLATION = {
 FALSE_POSITIVE_DOMAINS_FOUND_IN_PATHS = ["microsoft.net"]
 
 SILENT_SIGNATURES = ["enumerates_running_processes"]
+COMMAND_LINE_KEYS = ["command", "cmdline", "Commandline executed"]
+FILE_KEYS = ["DeletedFile", "file", "binary", "copy", "service path", "office_martian", "File executed"]
+REGISTRY_KEYS = ["key", "regkey", "regkeyval"]
+URL_KEYS = ["http_request", "url", "suspicious_request", "network_http", "request", "http_downloadurl", "uri"]
+IP_KEYS = ["IP"]
+DOMAIN_KEYS = ["domain"]
 
 
 class IntezerDynamic(ServiceBase):
@@ -88,6 +94,10 @@ class IntezerDynamic(ServiceBase):
     def start(self) -> None:
         global global_safelist
         self.log.debug("IntezerDynamic service started...")
+
+        if self.config.get("base_url") != BASE_URL and not self.config["is_on_premise"]:
+            self.log.warning(f"You are using a base url that is not {BASE_URL}, yet you do not have the 'is_on_premise' parameter set to true. Are you sure?")
+
         self.client = IntezerApi(
             api_version=self.config.get("api_version", API_VERSION),
             api_key=self.config["api_key"],
@@ -108,11 +118,16 @@ class IntezerDynamic(ServiceBase):
 
         sha256 = request.sha256
 
-        main_api_result = self.client.get_latest_analysis(
-            file_hash=sha256, private_only=self.config["private_only"]
-        )
+        analysis_id = request.get_param('analysis_id')
+        if not analysis_id:
+            main_api_result = self.client.get_latest_analysis(
+                file_hash=sha256, private_only=self.config["private_only"]
+            )
+        else:
+            main_api_result = {"analysis_id": analysis_id, "verdict": None}
 
         if not main_api_result:
+            self.log.debug(f"SHA256 {sha256} is not on the system.")
             # TODO: Make dynamic
             # resp = self.client.analyze_by_file(request.file_path, request.file_name)
 
@@ -131,8 +146,6 @@ class IntezerDynamic(ServiceBase):
                 "attribution.family", main_api_result["family_name"]
             )
 
-        self.set_heuristic_by_verdict(main_kv_section, main_api_result["verdict"])
-
         file_verdict_map = {}
         self.process_iocs(analysis_id, file_verdict_map, main_kv_section)
         self.process_ttps(analysis_id, main_kv_section)
@@ -145,7 +158,6 @@ class IntezerDynamic(ServiceBase):
             )
             sub_analyses = []
 
-        can_we_get_strings = True
         can_we_download_files = True
         process_path_set = set()
         command_line_set = set()
@@ -168,26 +180,9 @@ class IntezerDynamic(ServiceBase):
                 # Otherwise, boring!
                 continue
 
-            if can_we_get_strings:
-                # TODO: This may be not useful in Assemblyline's context
-                try:
-                    strings = self.client.get_strings_by_id(analysis_id, sub_analysis_id)
-                    print(strings)
-                except HTTPError as e:
-                    # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
-                    self.log.debug(
-                        f"Unable to get strings for SHA256 {sub['sha256']} due to {e}"
-                    )
-                    strings = None
-                    can_we_get_strings = False
-
-            try:
-                capabilities = self.client.get_sub_analysis_capabilities_by_id(analysis_id, sub_analysis_id)
-                print(capabilities)
-            except HTTPError as e:
-                self.log.debug(
-                    f"Unable to get capabilities for SHA256 {sub['sha256']} due to {e}"
-                )
+            if families and not any(family["reused_gene_count"] > 1 for family in families):
+                # Most likely a false positive
+                continue
 
             extraction_method = sub["source"].replace("_", " ")
 
@@ -288,7 +283,12 @@ class IntezerDynamic(ServiceBase):
         if process_tree_section.body:
             main_kv_section.add_subsection(process_tree_section)
 
-        result.add_section(main_kv_section)
+        # Setting heuristic here to avoid FPs
+        if main_kv_section.subsections:
+            self.set_heuristic_by_verdict(main_kv_section, main_api_result["verdict"])
+
+        if main_kv_section.subsections or main_kv_section.heuristic:
+            result.add_section(main_kv_section)
         request.result = result
 
     @staticmethod
@@ -400,6 +400,11 @@ class IntezerDynamic(ServiceBase):
                 f"Unable to retrieve TTPs for analysis ID {analysis_id} due to {e}"
             )
             ttps = []
+        except UnsupportedOnPremiseVersion as e:
+            self.log.debug(
+                f"Unable to retrieve TTPs for analysis ID {analysis_id} due to {e}"
+            )
+            ttps = []
 
         if not ttps:
             return
@@ -435,24 +440,27 @@ class IntezerDynamic(ServiceBase):
                 if not value:
                     continue
 
-                if key in ["IP"] and not add_tag(sig_res, "network.dynamic.ip", value):
+                if key in IP_KEYS and not add_tag(sig_res, "network.dynamic.ip", value):
                     _extract_iocs_from_text_blob(value, ioc_table)
-                elif key in ["command", "cmdline"]:
+                elif key in COMMAND_LINE_KEYS:
                     _ = add_tag(sig_res, "dynamic.process.command_line", value)
                     _extract_iocs_from_text_blob(value, ioc_table)
-                elif key in ["DeletedFile", "file", "binary", "copy", "service path", "office_martian"]:
+                elif key in FILE_KEYS:
                     _ = add_tag(sig_res, "dynamic.process.file_name", value)
-                elif key in ["http_request", "url", "suspicious_request", "network_http", "request", "http_downloadurl"]:
+                elif key in URL_KEYS:
                     _extract_iocs_from_text_blob(value, ioc_table)
-                elif key in ["key"]:
+                elif key in REGISTRY_KEYS:
                     _ = add_tag(sig_res, "dynamic.registry_key", value)
-                elif key in ["domain"]:
+                elif key in DOMAIN_KEYS:
                     _ = add_tag(sig_res, "network.dynamic.domain", value)
                 else:
                     pass
                 if len(value) > 512:
                     value = value[:512] + "..."
-                sig_res.add_line(f"\t{key}: {value}")
+                if not sig_res.body:
+                    sig_res.add_line(f"\t{key}: {value}")
+                elif sig_res.body and f"\t{key}: {value}" not in sig_res.body:
+                    sig_res.add_line(f"\t{key}: {value}")
 
             if ioc_table.body:
                 sig_res.add_subsection(ioc_table)
