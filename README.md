@@ -22,6 +22,11 @@ If you are using Intezer's Dynamic Execution module, then set the service timeou
 * **api_key**: This is the 36 character key provided to you by [Intezer](https://www.intezer.com/blog/malware-analysis/api-intezer-analyze-community/).
 * **private_only**: This is a flag that will only return private submissions on the Intezer Analyze system, if selected.
 * **is_on_premise**: This is a flag used for indicating if the Intezer Analyze system is on-premise, rather than the cloud API.
+* **polling_period_in_seconds**: This integer is the time to wait between status checks for the current analysis.
+* **analysis_timeout_in_seconds**: This integer is the time to wait for an analysis to complete.
 
 ### Submission Parameters
 * **analysis_id**: This is the analysis ID of an analysis that is already on the system. The cloud API counts retrieving the analysis by file hash as a "File Scan" which counts towards an account's monthly quota. We can circumvent this by submitting the analysis ID of an analysis. That being said, this will ignore the file that you submit to Assemblyline.
+
+## Troubleshooting
+If you get this error "server returns The request is not valid, details: {'should_get_only_private_analysis': ['unknown field']}", then you need to set the service configuration value to true for "is_on_premise".

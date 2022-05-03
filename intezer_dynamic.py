@@ -1,21 +1,16 @@
-from ipaddress import ip_address
-import json
-import re
+from http import HTTPStatus
 from requests import HTTPError
-from typing import Any, Dict, List, Optional, Union
+from time import sleep, time
+from typing import Dict, List, Optional
 
 from intezer_sdk.api import IntezerApi
 from intezer_sdk.errors import UnsupportedOnPremiseVersion
-from intezer_sdk.consts import OnPremiseVersion, BASE_URL, API_VERSION
+from intezer_sdk.consts import OnPremiseVersion, BASE_URL, API_VERSION, AnalysisStatusCode
 from signatures import get_attack_ids_for_signature_name, get_heur_id_for_signature_name, GENERIC_HEURISTIC_ID
-
-from assemblyline.common.net_static import TLDS_ALPHA_BY_DOMAIN
-from assemblyline.common.str_utils import safe_str
-from assemblyline.odm.base import DOMAIN_REGEX, IP_REGEX, FULL_URI, URI_PATH, DOMAIN_ONLY_REGEX
 
 from assemblyline_v4_service.common.api import ServiceAPIError
 from assemblyline_v4_service.common.base import ServiceBase
-from assemblyline_v4_service.common.dynamic_service_helper import SandboxOntology
+from assemblyline_v4_service.common.dynamic_service_helper import extract_iocs_from_text_blob, SandboxOntology
 from assemblyline_v4_service.common.request import ServiceRequest
 from assemblyline_v4_service.common.result import (
     Result,
@@ -25,13 +20,9 @@ from assemblyline_v4_service.common.result import (
     ResultTextSection,
     TableRow,
 )
+from assemblyline_v4_service.common.tag_helper import add_tag
 
 global_safelist: Optional[Dict[str, Dict[str, List[str]]]] = None
-
-# Custom regex for finding uris in a text blob
-URL_REGEX = re.compile(
-    "(?:(?:(?:[A-Za-z]*:)?//)?(?:\S+(?::\S*)?@)?(?:(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|(?:(?:[A-Za-z0-9\u00a1-\uffff][A-Za-z0-9\u00a1-\uffff_-]{0,62})?[A-Za-z0-9\u00a1-\uffff]\.)+(?:xn--)?(?:[A-Za-z0-9\u00a1-\uffff]{2,}\.?))(?::\d{2,5})?)(?:[/?#][^\s,\\\\]*)?")
-
 
 UNINTERESTING_ANALYSIS_KEYS = [
     "analysis_url",
@@ -74,8 +65,6 @@ TTP_SEVERITY_TRANSLATION = {
     3: 250
 }
 
-FALSE_POSITIVE_DOMAINS_FOUND_IN_PATHS = ["microsoft.net"]
-
 SILENT_SIGNATURES = ["enumerates_running_processes"]
 COMMAND_LINE_KEYS = ["command", "cmdline", "Commandline executed"]
 FILE_KEYS = ["DeletedFile", "file", "binary", "copy", "service path", "office_martian", "File executed"]
@@ -84,12 +73,37 @@ URL_KEYS = ["http_request", "url", "suspicious_request", "network_http", "reques
 IP_KEYS = ["IP"]
 DOMAIN_KEYS = ["domain"]
 
+DEFAULT_ANALYSIS_TIMEOUT = 180
+DEFAULT_POLLING_PERIOD = 5
+
+COMPLETED_STATUSES = [AnalysisStatusCode.FINISH.value, AnalysisStatusCode.FAILED.value, "succeeded"]
+
+
+class ALIntezerApi(IntezerApi):
+    # Overriding the class method to handle if the URL is GONE
+    def get_latest_analysis(self,
+                            file_hash: str,
+                            private_only: bool = False,
+                            **additional_parameters) -> Optional[dict]:
+        try:
+            return IntezerApi.get_latest_analysis(
+                self=self,
+                file_hash=file_hash,
+                private_only=private_only,
+                additional_parameters=additional_parameters
+            )
+        except HTTPError as e:
+            if str(HTTPStatus.GONE.value) in repr(e) or HTTPStatus.GONE.name in repr(e):
+                return None
+            else:
+                raise
+
 
 class IntezerDynamic(ServiceBase):
     def __init__(self, config: Optional[Dict] = None) -> None:
         super().__init__(config)
         self.log.debug("Initializing the IntezerDynamic service...")
-        self.client: Optional[IntezerApi] = None
+        self.client: Optional[ALIntezerApi] = None
 
     def start(self) -> None:
         global global_safelist
@@ -98,7 +112,7 @@ class IntezerDynamic(ServiceBase):
         if self.config.get("base_url") != BASE_URL and not self.config["is_on_premise"]:
             self.log.warning(f"You are using a base url that is not {BASE_URL}, yet you do not have the 'is_on_premise' parameter set to true. Are you sure?")
 
-        self.client = IntezerApi(
+        self.client = ALIntezerApi(
             api_version=self.config.get("api_version", API_VERSION),
             api_key=self.config["api_key"],
             base_url=self.config.get("base_url", BASE_URL),
@@ -128,11 +142,27 @@ class IntezerDynamic(ServiceBase):
 
         if not main_api_result:
             self.log.debug(f"SHA256 {sha256} is not on the system.")
-            # TODO: Make dynamic
-            # resp = self.client.analyze_by_file(request.file_path, request.file_name)
 
-            request.result = result
-            return
+            start_time = time()
+            analysis_id = self.client.analyze_by_file(file_path=request.file_path, file_name=request.file_name)
+            status = AnalysisStatusCode.QUEUED
+
+            analysis_timeout = self.config.get("analysis_period_in_seconds", DEFAULT_ANALYSIS_TIMEOUT)
+            polling_period = self.config.get("polling_period_in_seconds", DEFAULT_POLLING_PERIOD)
+
+            while status not in COMPLETED_STATUSES or time() - start_time > analysis_timeout:
+                sleep(polling_period)
+                resp = self.client.get_file_analysis_response(analysis_id, ignore_not_found=False)
+                status = resp.json()["status"]
+
+            if status == AnalysisStatusCode.FAILED.value:
+                self.log.warning(f"{sha256} caused Intezer to crash")
+                request.result = result
+                return
+
+            main_api_result = self.client.get_latest_analysis(
+                file_hash=sha256, private_only=self.config["private_only"]
+            )
 
         analysis_id = main_api_result["analysis_id"]
 
@@ -375,7 +405,7 @@ class IntezerDynamic(ServiceBase):
                         f"The network IOC type of {type} is not in {NETWORK_IOC_TYPES}. Network item: {network}"
                     )
                 network_section.add_line(f"IOC: {ioc}")
-            parent_result_section.add_section(network_section)
+            parent_result_section.add_subsection(network_section)
 
     def process_ttps(
         self,
@@ -440,19 +470,19 @@ class IntezerDynamic(ServiceBase):
                 if not value:
                     continue
 
-                if key in IP_KEYS and not add_tag(sig_res, "network.dynamic.ip", value):
-                    _extract_iocs_from_text_blob(value, ioc_table)
+                if key in IP_KEYS and not add_tag(sig_res, "network.dynamic.ip", value, global_safelist):
+                    extract_iocs_from_text_blob(value, ioc_table)
                 elif key in COMMAND_LINE_KEYS:
-                    _ = add_tag(sig_res, "dynamic.process.command_line", value)
-                    _extract_iocs_from_text_blob(value, ioc_table)
+                    _ = add_tag(sig_res, "dynamic.process.command_line", value, global_safelist)
+                    extract_iocs_from_text_blob(value, ioc_table)
                 elif key in FILE_KEYS:
-                    _ = add_tag(sig_res, "dynamic.process.file_name", value)
+                    _ = add_tag(sig_res, "dynamic.process.file_name", value, global_safelist)
                 elif key in URL_KEYS:
-                    _extract_iocs_from_text_blob(value, ioc_table)
+                    extract_iocs_from_text_blob(value, ioc_table)
                 elif key in REGISTRY_KEYS:
-                    _ = add_tag(sig_res, "dynamic.registry_key", value)
+                    _ = add_tag(sig_res, "dynamic.registry_key", value, global_safelist)
                 elif key in DOMAIN_KEYS:
-                    _ = add_tag(sig_res, "network.dynamic.domain", value)
+                    _ = add_tag(sig_res, "network.dynamic.domain", value, global_safelist)
                 else:
                     pass
                 if len(value) > 512:
@@ -469,188 +499,3 @@ class IntezerDynamic(ServiceBase):
 
         if sigs_res.subsections:
             parent_result_section.add_subsection(sigs_res)
-
-
-def _extract_iocs_from_text_blob(
-        blob: str, result_section: ResultTableSection, so_sig: SandboxOntology.Signature = None) -> None:
-    """
-    This method searches for domains, IPs and URIs used in blobs of text and tags them
-    :param blob: The blob of text that we will be searching through
-    :param result_section: The result section that that tags will be added to
-    :param so_sig: The signature for the Sandbox Ontology
-    :return: None
-    """
-    if not blob:
-        return
-    blob = blob.lower()
-    ips = set(re.findall(IP_REGEX, blob))
-    # There is overlap here between regular expressions, so we want to isolate domains that are not ips
-    domains = set(re.findall(DOMAIN_REGEX, blob)) - ips
-    # There is overlap here between regular expressions, so we want to isolate uris that are not domains
-    uris = set(re.findall(URL_REGEX, blob)) - domains - ips
-    for ip in ips:
-        if add_tag(result_section, "network.dynamic.ip", ip):
-            if not result_section.section_body.body:
-                result_section.add_row(TableRow(ioc_type="ip", ioc=ip))
-            elif json.dumps({"ioc_type": "ip", "ioc": ip}) not in result_section.section_body.body:
-                result_section.add_row(TableRow(ioc_type="ip", ioc=ip))
-            if so_sig:
-                so_sig.add_subject(ip=ip)
-    for domain in domains:
-        # File names match the domain and URI regexes, so we need to avoid tagging them
-        # Note that get_tld only takes URLs so we will prepend http:// to the domain to work around this
-        if domain in FALSE_POSITIVE_DOMAINS_FOUND_IN_PATHS:
-            continue
-        tld = next((tld.lower() for tld in TLDS_ALPHA_BY_DOMAIN if domain.lower().endswith(f".{tld}".lower())), None)
-        if tld is None:
-            continue
-        if add_tag(result_section, "network.dynamic.domain", domain):
-            if not result_section.section_body.body:
-                result_section.add_row(TableRow(ioc_type="domain", ioc=domain))
-            elif json.dumps({"ioc_type": "domain", "ioc": domain}) not in result_section.section_body.body:
-                result_section.add_row(TableRow(ioc_type="domain", ioc=domain))
-            if so_sig:
-                so_sig.add_subject(domain=domain)
-
-    for uri in uris:
-        if add_tag(result_section, "network.dynamic.uri", uri):
-            if not result_section.section_body.body:
-                result_section.add_row(TableRow(ioc_type="uri", ioc=uri))
-            elif json.dumps({"ioc_type": "uri", "ioc": uri}) not in result_section.section_body.body:
-                result_section.add_row(TableRow(ioc_type="uri", ioc=uri))
-            if so_sig:
-                so_sig.add_subject(uri=uri)
-        if "//" in uri:
-            uri = uri.split("//")[1]
-        for uri_path in re.findall(URI_PATH, uri):
-            if add_tag(result_section, "network.dynamic.uri_path", uri_path):
-                if not result_section.section_body.body:
-                    result_section.add_row(TableRow(ioc_type="uri_path", ioc=uri_path))
-                elif json.dumps({"ioc_type": "uri_path", "ioc": uri_path}) not in result_section.section_body.body:
-                    result_section.add_row(TableRow(ioc_type="uri_path", ioc=uri_path))
-
-def add_tag(
-        result_section: ResultSection, tag: str, value: Union[Any, List[Any]]) -> bool:
-    """
-    This method adds the value(s) as a tag to the ResultSection. Can take a list of values or a single value.
-    :param result_section: The ResultSection that the tag will be added to
-    :param tag: The tag type that the value will be tagged under
-    :param value: The value, a single item or a list, that will be tagged under the tag type
-    :return: Tag was successfully added
-    """
-    tags_were_added = False
-    if not value:
-        return tags_were_added
-    if type(value) == list:
-        for item in value:
-            # If one tag is added, then return True
-            tags_were_added = _validate_tag(result_section, tag, item) or tags_were_added
-    else:
-        tags_were_added = _validate_tag(result_section, tag, value)
-    return tags_were_added
-
-def _validate_tag(result_section: ResultSection, tag: str, value: Any) -> bool:
-    """
-    This method validates the value relative to the tag type before adding the value as a tag to the ResultSection.
-    :param result_section: The ResultSection that the tag will be added to
-    :param tag: The tag type that the value will be tagged under
-    :param value: The item that will be tagged under the tag type
-    :return: Tag was successfully added
-    """
-    reg_to_match: Optional[str] = None
-    if "domain" in tag:
-        reg_to_match = DOMAIN_ONLY_REGEX
-    elif "uri_path" in tag:
-        reg_to_match = URI_PATH
-    elif "uri" in tag:
-        reg_to_match = FULL_URI
-    elif "ip" in tag:
-        if not is_ip(value):
-            return False
-        reg_to_match = IP_REGEX
-    if reg_to_match and not re.match(reg_to_match, value):
-        return False
-
-    if not is_safelisted(value, [tag], global_safelist):
-        # if "uri" is in the tag, let's try to extract its domain/ip and tag it.
-        if "uri" in tag:
-            # First try to get the domain
-            domain = re.search(DOMAIN_REGEX, value)
-            if domain:
-                domain = domain.group()
-                if domain in FALSE_POSITIVE_DOMAINS_FOUND_IN_PATHS:
-                    pass
-                else:
-                    tld = next((tld.lower()
-                                for tld in TLDS_ALPHA_BY_DOMAIN if domain.lower().endswith(f".{tld}".lower())), None)
-                    if tld is None:
-                        pass
-                    elif not is_safelisted(value, ["network.dynamic.domain"], global_safelist):
-                        result_section.add_tag("network.dynamic.domain", safe_str(domain))
-            # Then try to get the IP
-            ip = re.search(IP_REGEX, value)
-            if ip:
-                ip = ip.group()
-                if not is_safelisted(value, ["network.dynamic.ip"], global_safelist):
-                    result_section.add_tag("network.dynamic.ip", safe_str(ip))
-
-            if value not in [domain, ip]:
-                result_section.add_tag(tag, safe_str(value))
-        else:
-            result_section.add_tag(tag, safe_str(value))
-
-        return True
-
-def is_safelisted(
-        value: str, tags: List[str],
-        safelist: Dict[str, Dict[str, List[str]]],
-        substring: bool = False) -> bool:
-    """
-    Safelists of data that may come up in analysis that is "known good", and we can ignore in the Assemblyline report.
-    This method determines if a given value has any safelisted components
-    See README section on Assemblyline System Safelist on how to integrate the safelist found in al_config/system_safelist.yaml
-    :param value: The value to be checked if it has been safelisted
-    :param tags: The tags which will be used for grabbing specific values from the safelist
-    :param safelist: The safelist containing matches and regexs
-    :param substring: A flag that indicates if we should check if the value is contained within the match
-    :return: A boolean indicating if the value has been safelisted
-    """
-    if not value or not tags or not safelist:
-        return False
-
-    if not any(key in safelist for key in ["match", "regex"]):
-        return False
-
-    safelist_matches = safelist.get("match", {})
-    safelist_regexes = safelist.get("regex", {})
-
-    for tag in tags:
-        if tag in safelist_matches:
-            for safelist_match in safelist_matches[tag]:
-                if value.lower() == safelist_match.lower():
-                    return True
-                elif substring and safelist_match.lower() in value.lower():
-                    return True
-
-        if tag in safelist_regexes:
-            for safelist_regex in safelist_regexes[tag]:
-                if re.match(safelist_regex, value, re.IGNORECASE):
-                    return True
-
-    return False
-
-def is_ip(val: str) -> bool:
-    """
-    This method safely handles if a given string represents an IP
-    :param val: the given string
-    :return: a boolean representing if the given string represents an IP
-    """
-    try:
-        ip_address(val)
-        return True
-    except ValueError:
-        # In the occasional circumstance, a sample with make a call
-        # to an explicit IP, which breaks the way that AL handles
-        # domains
-        pass
-    return False

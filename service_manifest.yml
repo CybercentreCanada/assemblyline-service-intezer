@@ -23,6 +23,8 @@ config:
   api_key: sample_api_key
   private_only: false
   is_on_premise: false
+  polling_period_in_seconds: 5
+  analysis_timeout_in_seconds: 180
 
 submission_params:
   - default: ""
