@@ -184,6 +184,9 @@ def dummy_get_response_class():
     class DummyGetResponse:
         def __init__(self, text):
             self.text = text
+
+        def json(self):
+            return {"status": self.text}
     yield DummyGetResponse
 
 
@@ -194,6 +197,21 @@ def dummy_api_interface_class():
         def get_safelist():
             return []
     return DummyApiInterface
+
+
+@pytest.fixture
+def dummy_request_class():
+
+    class DummyRequest():
+        def __init__(self):
+            self.file_path = "blah"
+            self.file_name = "blah"
+            self.extracted = []
+
+        def add_extracted(self, path, name, description):
+            self.extracted.append({"path": path, "name": name, "description": description})
+
+    yield DummyRequest
 
 
 class TestIntezerDynamic:
@@ -232,11 +250,12 @@ class TestIntezerDynamic:
 
     @staticmethod
     @pytest.mark.parametrize("sample", samples)
-    def test_execute(sample, intezer_dynamic_class_instance, dummy_api_interface_class, mocker):
+    def test_execute(sample, intezer_dynamic_class_instance, dummy_api_interface_class, dummy_get_response_class, mocker):
         from assemblyline_v4_service.common.task import Task
         from assemblyline.odm.messages.task import Task as ServiceTask
         from assemblyline_v4_service.common.request import ServiceRequest
         from json import loads
+        from intezer_dynamic import ALIntezerApi
 
         mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_dynamic_class_instance.start()
@@ -249,6 +268,12 @@ class TestIntezerDynamic:
         intezer_dynamic_class_instance._task = task
         service_request = ServiceRequest(task)
         intezer_dynamic_class_instance.config["private_only"] = False
+
+        mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={"analysis_id": "blah"})
+        mocker.patch.object(ALIntezerApi, "analyze_by_file", return_value="blah")
+        mocker.patch.object(ALIntezerApi, "get_iocs", return_value={"files": [], "network": []})
+        mocker.patch.object(ALIntezerApi, "get_dynamic_ttps", return_value=[])
+        mocker.patch.object(ALIntezerApi, "get_sub_analyses_by_id", return_value=[])
 
         # Actually executing the sample
         intezer_dynamic_class_instance.execute(service_request)
@@ -287,6 +312,32 @@ class TestIntezerDynamic:
         intezer_dynamic_class_instance.execute(service_request)
 
     @staticmethod
+    def test_get_analysis_metadata(intezer_dynamic_class_instance, dummy_api_interface_class, mocker):
+        from intezer_dynamic import ALIntezerApi
+        mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
+        intezer_dynamic_class_instance.start()
+
+        analysis_metadata = {"analysis_id": "blah", "verdict": "malicious"}
+        mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value=analysis_metadata)
+        assert intezer_dynamic_class_instance._get_analysis_metadata("", "blah") == analysis_metadata
+        assert intezer_dynamic_class_instance._get_analysis_metadata("blah", "blah") == {"analysis_id": "blah", "verdict": None}
+
+    @staticmethod
+    def test_submit_file_for_analysis(intezer_dynamic_class_instance, dummy_request_class, dummy_get_response_class, dummy_api_interface_class, mocker):
+        from intezer_dynamic import ALIntezerApi
+        mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
+        intezer_dynamic_class_instance.start()
+
+        mocker.patch.object(ALIntezerApi, "analyze_by_file", return_value="blah")
+        mocker.patch.object(ALIntezerApi, "get_file_analysis_response", return_value=dummy_get_response_class("succeeded"))
+        mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={})
+        mocker.patch("intezer_dynamic.sleep")
+        assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+
+        mocker.patch.object(ALIntezerApi, "get_file_analysis_response", return_value=dummy_get_response_class("failed"))
+        assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+
+    @staticmethod
     @pytest.mark.parametrize("details, uninteresting_keys, expected_output",
         [
             ({}, [], {}),
@@ -296,34 +347,35 @@ class TestIntezerDynamic:
     )
     def test_process_details(details, uninteresting_keys, expected_output):
         from intezer_dynamic import IntezerDynamic
-        assert IntezerDynamic.process_details(details, uninteresting_keys) == expected_output
+        assert IntezerDynamic._process_details(details, uninteresting_keys) == expected_output
 
     @staticmethod
     def test_set_heuristic_by_verdict(intezer_dynamic_class_instance):
         from assemblyline_v4_service.common.result import ResultSection
         result_section = ResultSection("blah")
-        intezer_dynamic_class_instance.set_heuristic_by_verdict(result_section, None)
+        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, None)
         assert result_section.heuristic is None
 
-        intezer_dynamic_class_instance.set_heuristic_by_verdict(result_section, "blah")
+        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "blah")
         assert result_section.heuristic is None
 
-        intezer_dynamic_class_instance.set_heuristic_by_verdict(result_section, "trusted")
+        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "trusted")
         assert result_section.heuristic is None
 
-        intezer_dynamic_class_instance.set_heuristic_by_verdict(result_section, "malicious")
+        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "malicious")
         assert result_section.heuristic.heur_id == 1
 
         result_section = ResultSection("blah")
-        intezer_dynamic_class_instance.set_heuristic_by_verdict(result_section, "known_malicious")
+        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "known_malicious")
         assert result_section.heuristic.heur_id == 1
 
         result_section = ResultSection("blah")
-        intezer_dynamic_class_instance.set_heuristic_by_verdict(result_section, "suspicious")
+        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "suspicious")
         assert result_section.heuristic.heur_id == 2
 
     @staticmethod
     def test_process_iocs(intezer_dynamic_class_instance, dummy_api_interface_class, mocker):
+        from intezer_sdk.api import IntezerApi
         from assemblyline_v4_service.common.result import ResultSection
         from requests import HTTPError
         mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
@@ -331,18 +383,18 @@ class TestIntezerDynamic:
         parent_res_sec = ResultSection("blah")
         file_verdict_map = {}
 
-        mocker.patch.object(intezer_dynamic_class_instance.client, "get_iocs", return_value={"files": [], "network": []})
-        intezer_dynamic_class_instance.process_iocs("blah", file_verdict_map, parent_res_sec)
+        mocker.patch.object(IntezerApi, "get_iocs", return_value={"files": [], "network": []})
+        intezer_dynamic_class_instance._process_iocs("blah", file_verdict_map, parent_res_sec)
         assert parent_res_sec.subsections == []
         assert file_verdict_map == {}
 
-        mocker.patch.object(intezer_dynamic_class_instance.client, "get_iocs", side_effect=HTTPError("blah"))
-        intezer_dynamic_class_instance.process_iocs("blah", file_verdict_map, parent_res_sec)
+        mocker.patch.object(IntezerApi, "get_iocs", side_effect=HTTPError("FORBIDDEN"))
+        intezer_dynamic_class_instance._process_iocs("blah", file_verdict_map, parent_res_sec)
         assert parent_res_sec.subsections == []
         assert file_verdict_map == {}
 
-        mocker.patch.object(intezer_dynamic_class_instance.client, "get_iocs", return_value={"files": [{"sha256": "blah", "verdict": "malicious"}], "network": [{"ioc": "1.1.1.1", "type": "ip"}, {"ioc": "blah.com", "type": "domain"}]})
-        intezer_dynamic_class_instance.process_iocs("blah", file_verdict_map, parent_res_sec)
+        mocker.patch.object(IntezerApi, "get_iocs", return_value={"files": [{"sha256": "blah", "verdict": "malicious"}], "network": [{"ioc": "1.1.1.1", "type": "ip"}, {"ioc": "blah.com", "type": "domain"}]})
+        intezer_dynamic_class_instance._process_iocs("blah", file_verdict_map, parent_res_sec)
         correct_res_sec = ResultSection("Network Communication Observed")
         correct_res_sec.add_tag("network.dynamic.ip", "1.1.1.1")
         correct_res_sec.add_tag("network.dynamic.domain", "blah.com")
@@ -350,3 +402,346 @@ class TestIntezerDynamic:
         correct_res_sec.add_line("IOC: blah.com")
         assert check_section_equality(parent_res_sec.subsections[0], correct_res_sec)
         assert file_verdict_map == {"blah": "malicious"}
+
+    @staticmethod
+    def test_process_ttps(intezer_dynamic_class_instance, dummy_api_interface_class, mocker):
+        from intezer_sdk.api import IntezerApi
+        from intezer_sdk.errors import UnsupportedOnPremiseVersion
+        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
+        from requests import HTTPError
+        mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
+        intezer_dynamic_class_instance.start()
+        parent_res_sec = ResultSection("blah")
+
+        mocker.patch.object(IntezerApi, "get_dynamic_ttps", return_value=[])
+        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        assert parent_res_sec.subsections == []
+
+        mocker.patch.object(IntezerApi, "get_dynamic_ttps", side_effect=HTTPError("FORBIDDEN"))
+        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        assert parent_res_sec.subsections == []
+
+        mocker.patch.object(IntezerApi, "get_dynamic_ttps", side_effect=UnsupportedOnPremiseVersion())
+        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        assert parent_res_sec.subsections == []
+
+        mocker.patch.object(IntezerApi, "get_dynamic_ttps",
+            return_value=[{"name": "blah", "description": "blah", "data": [], "severity": 1}]
+        )
+        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        correct_res_sec = ResultSection("Signature: blah", "blah")
+        correct_res_sec.set_heuristic(4)
+        correct_res_sec.heuristic.add_signature_id("blah", 10)
+        assert check_section_equality(parent_res_sec.subsections[0].subsections[0], correct_res_sec)
+
+        parent_res_sec = ResultSection("blah")
+        mocker.patch.object(IntezerApi, "get_dynamic_ttps",
+            return_value=[{"name": "InjectionInterProcess", "description": "blah", "data": [], "severity": 1}]
+        )
+        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        correct_res_sec = ResultSection("Signature: InjectionInterProcess", "blah")
+        correct_res_sec.set_heuristic(7)
+        correct_res_sec.heuristic.add_signature_id("InjectionInterProcess", 10)
+        correct_res_sec.heuristic.add_attack_id("T1055")
+        assert check_section_equality(parent_res_sec.subsections[0].subsections[0], correct_res_sec)
+
+        parent_res_sec = ResultSection("blah")
+        mocker.patch.object(IntezerApi, "get_dynamic_ttps",
+            return_value=[{"name": "enumerates_running_processes", "description": "blah", "data": [{"wow": "print me!"}], "severity": 1}]
+        )
+        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        correct_res_sec = ResultSection("Signature: enumerates_running_processes", "blah")
+        correct_res_sec.set_heuristic(8)
+        correct_res_sec.heuristic.add_signature_id("enumerates_running_processes", 10)
+        correct_res_sec.heuristic.add_attack_id("T1057")
+        assert check_section_equality(parent_res_sec.subsections[0].subsections[0], correct_res_sec)
+
+        parent_res_sec = ResultSection("blah")
+        mocker.patch.object(IntezerApi, "get_dynamic_ttps",
+            return_value=[
+                {
+                    "name": "blah",
+                    "description": "blah",
+                    "data":
+                        [
+                            {"IP": "blah 2.2.2.2 blah"},
+                        ],
+                    "severity": 1
+                }
+            ]
+        )
+        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        correct_res_sec = ResultSection("Signature: blah", "blah")
+        correct_res_sec.add_line("\tIP: blah 2.2.2.2 blah")
+        correct_res_sec.set_heuristic(4)
+        correct_res_sec.heuristic.add_signature_id("blah", 10)
+        correct_ioc_res_sec = ResultTableSection("IOCs found in signature marks")
+        correct_ioc_res_sec.add_row(TableRow(ioc_type="ip", ioc="2.2.2.2"))
+        correct_ioc_res_sec.add_tag("network.dynamic.ip", "2.2.2.2")
+        correct_res_sec.add_subsection(correct_ioc_res_sec)
+        assert check_section_equality(parent_res_sec.subsections[0].subsections[0], correct_res_sec)
+
+    @staticmethod
+    def test_process_ttp_data(intezer_dynamic_class_instance):
+        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
+        sig_res = ResultSection("blah")
+        ioc_table = ResultTableSection("blah")
+
+        intezer_dynamic_class_instance._process_ttp_data(
+            [
+                {"wow": "print me!"},
+                {"a": ""},
+                {"IP": "1.1.1.1"},
+                {"IP": "blah 2.2.2.2 blah"},
+                {"command": "do bad thing"},
+                {"DeletedFile": "blah.exe"},
+                {"key": "HKEY\\Registry\\Key\\Path"},
+                {"http_request": "http://blah.com/blah"},
+                {"domain": "blah.ca"},
+                {"domain": "blah.ca"},
+                {"b": "blah"*150},
+            ], sig_res, ioc_table,
+        )
+        correct_res_sec = ResultSection("blah")
+        correct_res_sec.add_lines(
+            [
+                "\twow: print me!", "\tIP: 1.1.1.1", "\tIP: blah 2.2.2.2 blah", "\tcommand: do bad thing",
+                "\tDeletedFile: blah.exe", "\tkey: HKEY\\Registry\\Key\\Path", "\thttp_request: http://blah.com/blah",
+                "\tdomain: blah.ca", "\tb: blahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblahblah..."
+            ]
+        )
+        correct_res_sec.add_tag("network.dynamic.ip", "1.1.1.1")
+        correct_res_sec.add_tag("dynamic.process.command_line", "do bad thing")
+        correct_res_sec.add_tag("dynamic.process.file_name", "blah.exe")
+        correct_res_sec.add_tag("dynamic.registry_key", "HKEY\\Registry\\Key\\Path")
+        correct_res_sec.add_tag("network.dynamic.domain", "blah.ca")
+        correct_ioc_res_sec = ResultTableSection("blah")
+        correct_ioc_res_sec.add_row(TableRow(ioc_type="ip", ioc="2.2.2.2"))
+        correct_ioc_res_sec.add_row(TableRow(ioc_type="domain", ioc="blah.com"))
+        correct_ioc_res_sec.add_row(TableRow(ioc_type="uri", ioc="http://blah.com/blah"))
+        correct_ioc_res_sec.add_row(TableRow(ioc_type="uri_path", ioc="/blah"))
+        correct_ioc_res_sec.add_tag("network.dynamic.ip", "2.2.2.2")
+        correct_ioc_res_sec.add_tag("network.dynamic.domain", "blah.com")
+        correct_ioc_res_sec.add_tag("network.dynamic.uri", "http://blah.com/blah")
+        correct_ioc_res_sec.add_tag("network.dynamic.uri_path", "/blah")
+        assert check_section_equality(sig_res, correct_res_sec)
+        assert check_section_equality(ioc_table, correct_ioc_res_sec)
+
+    @staticmethod
+    def test_handle_subanalyses(intezer_dynamic_class_instance, dummy_request_class, dummy_api_interface_class, mocker):
+        from assemblyline_v4_service.common.result import ResultSection, ResultKeyValueSection, ResultProcessTreeSection, ProcessItem
+        mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
+        intezer_dynamic_class_instance.start()
+
+        mocker.patch.object(intezer_dynamic_class_instance.client, "get_sub_analyses_by_id", return_value=[])
+        parent_result_section = ResultSection("blah")
+        intezer_dynamic_class_instance._handle_subanalyses(dummy_request_class(), "blah", "blah", {}, parent_result_section)
+        assert parent_result_section.subsections == []
+
+        mocker.patch.object(
+            intezer_dynamic_class_instance.client,
+            "get_sub_analyses_by_id",
+            return_value=[
+                {
+                    "sub_analysis_id": "blah",
+                    "extraction_info": {
+                        "processes": [
+                            {
+                                "process_id": 124,
+                                "process_path": "blah2.exe",
+                                "parent_process_id": 321,
+                                "module_path": "blah2.exe"
+                            },
+                        ]
+                    },
+                    "source": "blah_blah",
+                    "sha256": "blah2"
+                }
+            ]
+        )
+        mocker.patch.object(
+            intezer_dynamic_class_instance.client,
+            "get_sub_analysis_code_reuse_by_id",
+            return_value={
+                "families": [{"reused_gene_count": 2}],
+                "blah": "blah"
+            }
+        )
+        mocker.patch.object(
+            intezer_dynamic_class_instance.client,
+            "get_sub_analysis_metadata_by_id",
+            return_value={
+                "source": "blah",
+                "blah": "blah"
+            }
+        )
+        mocker.patch.object(intezer_dynamic_class_instance, "_process_families")
+        mocker.patch.object(intezer_dynamic_class_instance.client, "download_file_by_sha256", return_value=True)
+        correct_result_section = ResultKeyValueSection("Subanalysis report for blah2, extracted via blah blah")
+        correct_result_section.update_items({"blah": "blah"})
+        correct_code_reuse = ResultKeyValueSection("Code reuse detected")
+        correct_code_reuse.update_items({"blah": "blah"})
+        correct_result_section.add_subsection(correct_code_reuse)
+        correct_process_tree = ResultProcessTreeSection("Spawned Process Tree")
+        correct_process_tree.add_process(ProcessItem(pid=124, name="blah2.exe", cmd=None))
+        correct_process_tree.add_tag("dynamic.processtree_id", "blah2.exe")
+        correct_process_tree.add_tag("dynamic.process.file_name", "blah2.exe")
+        dummy_request_class_instance = dummy_request_class()
+        intezer_dynamic_class_instance._handle_subanalyses(dummy_request_class_instance, "blah", "blah", {}, parent_result_section)
+        assert check_section_equality(parent_result_section.subsections[0], correct_result_section)
+        assert check_section_equality(parent_result_section.subsections[1], correct_process_tree)
+        assert dummy_request_class_instance.extracted[0]["description"] == "Extracted via blah blah"
+        assert dummy_request_class_instance.extracted[0]["name"] == "blah2.sample"
+
+    @staticmethod
+    @pytest.mark.parametrize("families, file_verdict_map, correct_tags, correct_fvp",
+        [
+            ([], {}, [], {}),
+            ([{"blah": "blah", "family_type": "blah", "family_name": "blah"}], {}, [("attribution.family", "blah")], {}),
+            ([{"family_id": "blah", "family_type": "blah", "family_name": "blah"}], {}, [("attribution.family", "blah")], {}),
+            ([{"family_id": "blah", "family_type": "application", "family_name": "blah"}], {}, [], {}),
+            ([{"family_id": "blah", "family_type": "malware", "family_name": "blah"}], {}, [("attribution.family", "blah")], {"blah": "malicious"}),
+            ([{"family_id": "blah", "family_type": "malware", "family_name": "blah"}], {"blah": "blah"}, [("attribution.family", "blah")], {"blah": "malicious"}),
+            ([{"family_id": "blah", "family_type": "malware", "family_name": "blah"}], {"blah": "malicious"}, [("attribution.family", "blah")], {"blah": "malicious"}),
+            ([{"family_id": "blah", "family_type": "packer", "family_name": "blah"}], {}, [("attribution.family", "blah")], {"blah": "suspicious"}),
+            ([{"family_id": "blah", "family_type": "packer", "family_name": "blah"}], {"blah": "malicious"}, [("attribution.family", "blah")], {"blah": "malicious"}),
+        ]
+    )
+    def test_process_families(families, file_verdict_map, correct_tags, correct_fvp, intezer_dynamic_class_instance):
+        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
+
+        parent_section = ResultSection("blah")
+        intezer_dynamic_class_instance._process_families(families, "blah", file_verdict_map, parent_section)
+
+        if not families:
+            assert parent_section.subsections == []
+        else:
+            correct_result_section = ResultTableSection("Family Details")
+            for family in families:
+                if "family_id" in family:
+                    family.pop("family_id")
+                correct_result_section.add_row(TableRow(**family))
+            for tag in correct_tags:
+                correct_result_section.add_tag(tag[0], tag[1])
+
+            assert check_section_equality(parent_section.subsections[0], correct_result_section)
+            assert file_verdict_map == correct_fvp
+
+    @staticmethod
+    def test_process_extraction_info(intezer_dynamic_class_instance):
+        from assemblyline_v4_service.common.dynamic_service_helper import SandboxOntology
+        so = SandboxOntology()
+
+        processes = [
+            {
+                "process_id": 123,
+                "process_path": "blah.exe",
+                "parent_process_id": 321,
+                "module_path": "blah.exe"
+            },
+            {
+                "process_id": 124,
+                "process_path": "blah2.exe",
+                "parent_process_id": 321,
+                "module_path": "blah2.dll,blah"
+            },
+            {
+                "process_id": 123,
+                "process_path": "blah.exe",
+                "parent_process_id": 321,
+                "module_path": "blah.dll,blah"
+            },
+            {
+                "process_id": 321,
+                "process_path": "blah3.exe",
+                "parent_process_id": 322,
+                "module_path": "blah3.exe"
+            },
+        ]
+        process_path_set = set()
+        command_line_set = set()
+        correct_processes = [
+            {
+                "start_time": float("-inf"),
+                "end_time": float("inf"),
+                "objectid": {
+                    "tag": "blah.exe",
+                    "treeid": None,
+                    "processtree": None,
+                    "time_observed": float("-inf")
+                },
+                "pobjectid": {
+                    "tag": "blah3.exe",
+                    "treeid": None,
+                    "processtree": None,
+                    "time_observed": float("-inf")
+                },
+                "pimage": "blah3.exe",
+                "pcommand_line": None,
+                "ppid": 321,
+                "pid": 123,
+                "image": "blah.exe",
+                "command_line": "blah.exe blah.dll,blah",
+                "integrity_level": None,
+                "image_hash": None,
+                "original_file_name": None,
+            },
+            {
+                "start_time": float("-inf"),
+                "end_time": float("inf"),
+                "objectid": {
+                    "tag": "blah2.exe",
+                    "treeid": None,
+                    "processtree": None,
+                    "time_observed": float("-inf")
+                },
+                "pobjectid": {
+                    "tag": "blah3.exe",
+                    "treeid": None,
+                    "processtree": None,
+                    "time_observed": float("-inf")
+                },
+                "pimage": "blah3.exe",
+                "pcommand_line": None,
+                "ppid": 321,
+                "pid": 124,
+                "image": "blah2.exe",
+                "command_line": "blah2.exe blah2.dll,blah",
+                "integrity_level": None,
+                "image_hash": None,
+                "original_file_name": None,
+            },
+            {
+                "start_time": float("-inf"),
+                "end_time": float("inf"),
+                "objectid": {
+                    "tag": "blah3.exe",
+                    "treeid": None,
+                    "processtree": None,
+                    "time_observed": float("-inf")
+                },
+                "pobjectid": {
+                    "tag": None,
+                    "treeid": None,
+                    "processtree": None,
+                    "time_observed": None
+                },
+                "pimage": None,
+                "pcommand_line": None,
+                "ppid": 322,
+                "pid": 321,
+                "image": "blah3.exe",
+                "command_line": None,
+                "integrity_level": None,
+                "image_hash": None,
+                "original_file_name": None,
+            },
+        ]
+        intezer_dynamic_class_instance._process_extraction_info(processes, process_path_set, command_line_set, so)
+        for index, process in enumerate(so.get_processes()):
+            process_as_primitives = process.as_primitives()
+            process_as_primitives["objectid"].pop("guid")
+            process_as_primitives["pobjectid"].pop("guid")
+            assert process_as_primitives == correct_processes[index]
+        assert process_path_set == {"blah.dll,blah", "blah2.dll,blah", "blah2.exe", "blah.exe", "blah3.exe"}
+        assert command_line_set == {"blah.exe blah.dll,blah", "blah2.exe blah2.dll,blah"}
