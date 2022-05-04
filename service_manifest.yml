@@ -1,4 +1,4 @@
-name: IntezerStatic
+name: IntezerDynamic
 version: 4.2.0.stable1
 description: Fetch the Intezer results of the submitted file's sha256
 
@@ -22,6 +22,15 @@ config:
   api_version: v2-0
   api_key: sample_api_key
   private_only: false
+  is_on_premise: false
+  polling_period_in_seconds: 5
+  analysis_timeout_in_seconds: 180
+
+submission_params:
+  - default: ""
+    name: analysis_id
+    type: str
+    value: ""
 
 heuristics:
   - heur_id: 1
@@ -34,6 +43,46 @@ heuristics:
     score: 500
     filetype: .*
     description: Intezer considers this file suspicious
+  - heur_id: 4
+    name: Generic signature raised
+    score: 0
+    filetype: .*
+    description: Intezer raised a signature
+  - heur_id: 5
+    name: Command And Control
+    score: 0
+    filetype: .*
+    description: Intezer raised a signature
+  - heur_id: 6
+    name: Credential Access
+    score: 0
+    filetype: .*
+    description: Intezer raised a signature
+  - heur_id: 7
+    name: Defense Evasion
+    score: 0
+    filetype: .*
+    description: Intezer raised a signature
+  - heur_id: 8
+    name: Discovery
+    score: 0
+    filetype: .*
+    description: Intezer raised a signature
+  - heur_id: 9
+    name: Execution
+    score: 0
+    filetype: .*
+    description: Intezer raised a signature
+  - heur_id: 10
+    name: Persistence
+    score: 0
+    filetype: .*
+    description: Intezer raised a signature
+  - heur_id: 11
+    name: Collection
+    score: 0
+    filetype: .*
+    description: Intezer raised a signature
 
 docker_config:
   image: ghcr.io/nvisosecurity/assemblyline-service-intezer:main
