@@ -272,6 +272,7 @@ class TestIntezerDynamic:
         mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={"analysis_id": "blah"})
         mocker.patch.object(ALIntezerApi, "analyze_by_file", return_value="blah")
         mocker.patch.object(ALIntezerApi, "get_iocs", return_value={"files": [], "network": []})
+        mocker.patch.object(ALIntezerApi, "get_dynamic_ttps", return_value=[])
         mocker.patch.object(ALIntezerApi, "get_sub_analyses_by_id", return_value=[])
 
         # Actually executing the sample
