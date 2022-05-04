@@ -311,6 +311,12 @@ class TestIntezerDynamic:
         service_request = ServiceRequest(task)
         intezer_dynamic_class_instance.execute(service_request)
 
+        task.service_config = {"analysis_id": ""}
+        intezer_dynamic_class_instance.config["is_on_premise"] = False
+        mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={"verdict": "not_supported"})
+        mocker.patch.object(ALIntezerApi, "get_dynamic_ttps", return_value=[])
+        intezer_dynamic_class_instance.execute(service_request)
+
     @staticmethod
     def test_get_analysis_metadata(intezer_dynamic_class_instance, dummy_api_interface_class, mocker):
         from intezer_dynamic import ALIntezerApi
@@ -324,6 +330,8 @@ class TestIntezerDynamic:
 
     @staticmethod
     def test_submit_file_for_analysis(intezer_dynamic_class_instance, dummy_request_class, dummy_get_response_class, dummy_api_interface_class, mocker):
+        from intezer_sdk.api import IntezerApi
+        from intezer_sdk.errors import ServerError
         from intezer_dynamic import ALIntezerApi
         mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_dynamic_class_instance.start()
@@ -335,6 +343,9 @@ class TestIntezerDynamic:
         assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
 
         mocker.patch.object(ALIntezerApi, "get_file_analysis_response", return_value=dummy_get_response_class("failed"))
+        assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+
+        mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(415, dummy_get_response_class("blah")))
         assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
 
     @staticmethod
