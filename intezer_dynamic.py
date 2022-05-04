@@ -1,10 +1,11 @@
+from enum import Enum
 from http import HTTPStatus
 from requests import HTTPError
 from time import sleep, time
 from typing import Any, Dict, List, Optional, Set
 
 from intezer_sdk.api import IntezerApi
-from intezer_sdk.errors import UnsupportedOnPremiseVersion
+from intezer_sdk.errors import UnsupportedOnPremiseVersion, ServerError
 from intezer_sdk.consts import OnPremiseVersion, BASE_URL, API_VERSION, AnalysisStatusCode
 from signatures import get_attack_ids_for_signature_name, get_heur_id_for_signature_name, GENERIC_HEURISTIC_ID
 
@@ -43,19 +44,6 @@ UNINTERESTING_SUBANALYSIS_KEYS = [
 ]
 UNINTERESTING_FAMILY_KEYS = ["family_id"]
 
-MALICIOUS = "malicious"
-KNOWN_MALICIOUS = "known_malicious"
-MALICIOUS_VERDICTS = [MALICIOUS, KNOWN_MALICIOUS]
-SUSPICIOUS = "suspicious"
-UNKNOWN = "unknown"
-TRUSTED = "trusted"
-INTERESTING_VERDICTS = [MALICIOUS, KNOWN_MALICIOUS, SUSPICIOUS]
-UNINTERESTING_VERDICTS = [UNKNOWN, TRUSTED]
-
-IP = "ip"
-DOMAIN = "domain"
-NETWORK_IOC_TYPES = [IP, DOMAIN]
-
 FAMILIES_TO_NOT_TAG = ["application", "library"]
 MALICIOUS_FAMILY_TYPES = ["malware"]
 SUSPICIOUS_FAMILY_TYPES = ["administration_tool", "installer", "packer"]
@@ -80,6 +68,61 @@ DEFAULT_POLLING_PERIOD = 5
 COMPLETED_STATUSES = [AnalysisStatusCode.FINISH.value, AnalysisStatusCode.FAILED.value, "succeeded"]
 
 
+# From the user-guide
+class Verdicts(Enum):
+    # Trusted
+    KNOWN_TRUSTED = "known_trusted"
+    TRUSTED = "trusted"
+    PROBABLY_TRUSTED = "probably_trusted"
+    KNOWN_LIBRARY = "known_library"
+    LIBRARY = "library"
+    TRUSTED_VERDICTS = [KNOWN_TRUSTED, TRUSTED, PROBABLY_TRUSTED, KNOWN_LIBRARY, LIBRARY]
+
+    # Malicious
+    KNOWN_MALICIOUS = "known_malicious"
+    MALICIOUS = "malicious"
+    MALICIOUS_VERDICTS = [MALICIOUS, KNOWN_MALICIOUS]
+
+    # Suspicious
+    ADMINISTRATION_TOOL = "administration_tool"
+    KNOWN_ADMINISTRATION_TOOL = "known_administration_tool"
+    PACKED = "packed"
+    PROBABLY_PACKED = "probably_packed"
+    SCRIPT = "script"
+    SUSPICIOUS = "suspicious"
+    SUSPICIOUS_VERDICTS = [ADMINISTRATION_TOOL, KNOWN_ADMINISTRATION_TOOL, PACKED, PROBABLY_PACKED, SCRIPT, SUSPICIOUS]
+
+    # Unknown
+    UNIQUE = "unique"
+    NO_GENES = "no_genes"
+    ALMOST_NO_GENES = "almost_no_genes"
+    INCONCLUSIVE = "inconclusive"
+    INSTALLER = "installer"
+    NO_CODE = "no_code"
+    UNKNOWN = "unknown"
+    UNKNOWN_VERDICTS = [UNIQUE, NO_GENES, ALMOST_NO_GENES, INCONCLUSIVE, INSTALLER, NO_CODE, UNKNOWN]
+
+    # Not supported
+    FILE_TYPE_NOT_SUPPORTED = "file_type_not_supported"
+    NO_NATIVE_CODE = "non_native_code"
+    CORRUPTED_FILE = "corrupted_file"
+    NOT_SUPPORTED = "not_supported"
+    NOT_SUPPORTED_VERDICTS = [FILE_TYPE_NOT_SUPPORTED, NOT_SUPPORTED, NO_NATIVE_CODE, CORRUPTED_FILE]
+
+    # Neutral
+    NEUTRAL = "neutral"
+    NEUTRAL_VERDICTS = [NEUTRAL]
+
+    INTERESTING_VERDICTS = MALICIOUS_VERDICTS + SUSPICIOUS_VERDICTS
+    UNINTERESTING_VERDICTS = NEUTRAL_VERDICTS + NOT_SUPPORTED_VERDICTS + UNKNOWN_VERDICTS + TRUSTED_VERDICTS
+
+
+class NetworkIOCTypes(Enum):
+    IP = "ip"
+    DOMAIN = "domain"
+    TYPES = [IP, DOMAIN]
+
+
 class ALIntezerApi(IntezerApi):
     def set_logger(self, log):
         self.log = log
@@ -98,7 +141,7 @@ class ALIntezerApi(IntezerApi):
             )
         except HTTPError as e:
             self.log.debug(
-                f"Unable to get the latest analysis for SHA256 {file_hash} due to {e}"
+                f"Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'"
             )
             # Occasionally an analysis fails, and HTTPError.GONE is raised
             if str(HTTPStatus.GONE.value) in repr(e) or HTTPStatus.GONE.name in repr(e):
@@ -109,10 +152,10 @@ class ALIntezerApi(IntezerApi):
     # Overriding the class method to handle if the HTTPError exists
     def get_iocs(self, analysis_id: str) -> Dict[str, List[Dict[str, str]]]:
         try:
-            return IntezerApi.get_iocs(self=self, analysis_id=analysis_id)
+            return IntezerApi.get_iocs(self=self, analyses_id=analysis_id)
         except HTTPError as e:
             self.log.debug(
-                f"Unable to retrieve IOCs for analysis ID {analysis_id} due to {e}"
+                f"Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'"
             )
             # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
             if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
@@ -123,10 +166,10 @@ class ALIntezerApi(IntezerApi):
     # Overriding the class method to handle if the HTTPError or UnsupportedOnPremiseVersion exists
     def get_dynamic_ttps(self, analysis_id: str) -> List[Dict[str, str]]:
         try:
-            return IntezerApi.get_dynamic_ttps(self=self, analysis_id=analysis_id)
+            return IntezerApi.get_dynamic_ttps(self=self, analyses_id=analysis_id)
         except HTTPError as e:
             self.log.debug(
-                f"Unable to retrieve TTPs for analysis ID {analysis_id} due to {e}"
+                f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'"
             )
             # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
             if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
@@ -135,7 +178,7 @@ class ALIntezerApi(IntezerApi):
                 raise
         except UnsupportedOnPremiseVersion as e:
             self.log.debug(
-                f"Unable to retrieve TTPs for analysis ID {analysis_id} due to {e}"
+                f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'"
             )
             return []
 
@@ -145,7 +188,7 @@ class ALIntezerApi(IntezerApi):
             return IntezerApi.get_sub_analyses_by_id(self=self, analysis_id=analysis_id)
         except HTTPError as e:
             self.log.debug(
-                f"Unable to get sub_analyses for analysis ID {analysis_id} due to {e}"
+                f"Unable to get sub_analyses for analysis ID {analysis_id} due to '{e}'"
             )
             return []
 
@@ -158,11 +201,25 @@ class ALIntezerApi(IntezerApi):
             return True
         except HTTPError as e:
             self.log.debug(
-                f"Unable to download file for SHA256 {sha256} due to {e}"
+                f"Unable to download file for SHA256 {sha256} due to '{e}'"
             )
             # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
             if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
                 return False
+            else:
+                raise
+
+    # Overriding the class method to handle if the ServerError exists
+    def analyze_by_file(self, sha256: str, file_path: str, file_name: str, verify_file_support: bool) -> str:
+        try:
+            return IntezerApi.analyze_by_file(self=self, file_path=file_path, file_name=file_name, verify_file_support=verify_file_support)
+        except ServerError as e:
+            self.log.debug(
+                f"Unable to analyze file for SHA256 {sha256} due to '{e}'"
+            )
+            # If you submit a file that Intezer doesn't support, you will get a 415 UNSUPPORTED_MEDIA_TYPE on this endpoint.
+            if str(HTTPStatus.UNSUPPORTED_MEDIA_TYPE.value) in repr(e) or HTTPStatus.UNSUPPORTED_MEDIA_TYPE.name in repr(e):
+                return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
             else:
                 raise
 
@@ -213,6 +270,11 @@ class IntezerDynamic(ServiceBase):
         else:
             main_api_result = main_api_result_from_retrieval
 
+        if main_api_result.get("verdict") in Verdicts.NOT_SUPPORTED_VERDICTS.value:
+            self.log.debug(f"Unsupported file type: {request.file_type}")
+            request.result = result
+            return
+
         analysis_id = main_api_result["analysis_id"]
 
         # Setup the main result section
@@ -229,7 +291,8 @@ class IntezerDynamic(ServiceBase):
         # This file-verdict map will be used later on to assign heuristics to sub-analyses
         file_verdict_map = {}
         self._process_iocs(analysis_id, file_verdict_map, main_kv_section)
-        self._process_ttps(analysis_id, main_kv_section)
+        if not self.config["is_on_premise"]:
+            self._process_ttps(analysis_id, main_kv_section)
         self._handle_subanalyses(request, sha256, analysis_id, file_verdict_map, main_kv_section)
 
         # Setting heuristic here to avoid FPs
@@ -266,7 +329,10 @@ class IntezerDynamic(ServiceBase):
         start_time = time()
 
         # Send the file
-        analysis_id = self.client.analyze_by_file(file_path=request.file_path, file_name=request.file_name)
+        analysis_id = self.client.analyze_by_file(sha256=sha256, file_path=request.file_path, file_name=request.file_name, verify_file_support=True)
+        if analysis_id == Verdicts.FILE_TYPE_NOT_SUPPORTED.value:
+            return {"verdict": Verdicts.FILE_TYPE_NOT_SUPPORTED.value}
+
         status = AnalysisStatusCode.QUEUED
 
         analysis_timeout = self.config.get("analysis_period_in_seconds", DEFAULT_ANALYSIS_TIMEOUT)
@@ -313,16 +379,16 @@ class IntezerDynamic(ServiceBase):
             return
 
         if (
-            verdict not in INTERESTING_VERDICTS
-            and verdict not in UNINTERESTING_VERDICTS
+            verdict not in Verdicts.INTERESTING_VERDICTS.value
+            and verdict not in Verdicts.UNINTERESTING_VERDICTS.value
         ):
             self.log.debug(f"{verdict} was spotted. Is this useful?")
-        elif verdict in MALICIOUS_VERDICTS:
+        elif verdict in Verdicts.MALICIOUS_VERDICTS.value:
             result_section.set_heuristic(1)
-        elif verdict == SUSPICIOUS:
+        elif verdict in Verdicts.SUSPICIOUS_VERDICTS.value:
             result_section.set_heuristic(2)
-        elif verdict == TRUSTED:
-            self.log.debug("The verdict was TRUSTED. Can we do something with this?")
+        elif verdict in Verdicts.TRUSTED_VERDICTS.value:
+            self.log.debug(f"The verdict was {verdict}. Can we do something with this?")
 
     def _process_iocs(
         self,
@@ -352,13 +418,13 @@ class IntezerDynamic(ServiceBase):
             for network in network_iocs:
                 ioc = network["ioc"]
                 type = network["type"]
-                if type == IP:
+                if type == NetworkIOCTypes.IP.value:
                     network_section.add_tag("network.dynamic.ip", ioc)
-                elif type == DOMAIN:
+                elif type == NetworkIOCTypes.DOMAIN.value:
                     network_section.add_tag("network.dynamic.domain", ioc)
-                elif type not in NETWORK_IOC_TYPES:
+                elif type not in NetworkIOCTypes.TYPES.value:
                     self.log.debug(
-                        f"The network IOC type of {type} is not in {NETWORK_IOC_TYPES}. Network item: {network}"
+                        f"The network IOC type of {type} is not in {NetworkIOCTypes.TYPES.value}. Network item: {network}"
                     )
                 network_section.add_line(f"IOC: {ioc}")
             parent_result_section.add_subsection(network_section)
@@ -554,6 +620,7 @@ class IntezerDynamic(ServiceBase):
                             f"{sub_sha256}.sample",
                             f"Extracted via {extraction_method}",
                         )
+                        self.log.debug(f"Added {sub_sha256}.sample as an extracted file.")
                     else:
                         can_we_download_files = False
 
@@ -586,12 +653,12 @@ class IntezerDynamic(ServiceBase):
                 family_section.add_tag("attribution.family", family["family_name"])
 
             # Overwrite value if not malicious
-            if family_type in MALICIOUS_FAMILY_TYPES and (sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] != MALICIOUS):
-                file_verdict_map[sub_sha256] = MALICIOUS
+            if family_type in MALICIOUS_FAMILY_TYPES and (sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] != Verdicts.MALICIOUS.value):
+                file_verdict_map[sub_sha256] = Verdicts.MALICIOUS.value
 
             # Only overwrite value if value is not already malicious
-            elif family_type in SUSPICIOUS_FAMILY_TYPES and (sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] not in MALICIOUS_VERDICTS):
-                file_verdict_map[sub_sha256] = SUSPICIOUS
+            elif family_type in SUSPICIOUS_FAMILY_TYPES and (sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] not in Verdicts.MALICIOUS_VERDICTS.value):
+                file_verdict_map[sub_sha256] = Verdicts.SUSPICIOUS.value
 
         if family_section.body:
             parent_section.add_subsection(family_section)
