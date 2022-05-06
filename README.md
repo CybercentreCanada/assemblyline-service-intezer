@@ -12,7 +12,7 @@ This service calls the Intezer Analyze API with the hash of your file and return
 Because this service queries an external API, if selected by the user, it will prompt the user and notify them that their file or metadata related to their file will leave the Assemblyline system.
 
 ### Service Tweaks
-If you are using an Intezer Analyze On-Premise solution, then you do not need to set this service as `External`. Change the `category` in the `service_manifest.yml` from `External` to `Dynamic` if you are using Intezer's Dynamic Execution module, or `Antivirus` otherwise.
+If you are using an Intezer Analyze On-Premise solution, then you do not need to set this service as `External` and the `is_external` flag to true. Change the `category` in the `service_manifest.yml` from `External` to `Dynamic` if you are using Intezer's Dynamic Execution module on-prem, or `Antivirus` otherwise.
 
 If you are using Intezer's Dynamic Execution module, then set the service timeout to 300 seconds rather than 60 seconds for antivirus capabilities.
 
