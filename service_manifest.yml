@@ -22,7 +22,7 @@ timeout: 60
 disable_cache: false
 
 enabled: false
-is_external: true
+is_external: false
 licence_count: 0
 
 config:
@@ -33,7 +33,7 @@ config:
   private_only: false
   is_on_premise: false
   polling_period_in_seconds: 5
-  analysis_timeout_in_seconds: 180
+  analysis_timeout_in_seconds: 60
 
 submission_params:
   - default: ""

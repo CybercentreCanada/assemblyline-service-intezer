@@ -212,7 +212,8 @@ class ALIntezerApi(IntezerApi):
     # Overriding the class method to handle if the ServerError exists
     def analyze_by_file(self, sha256: str, file_path: str, file_name: str, verify_file_support: bool) -> str:
         try:
-            return IntezerApi.analyze_by_file(self=self, file_path=file_path, file_name=file_name, verify_file_support=verify_file_support)
+            return IntezerApi.analyze_by_file(
+                self=self, file_path=file_path, file_name=file_name, verify_file_support=verify_file_support)
         except ServerError as e:
             self.log.debug(
                 f"Unable to analyze file for SHA256 {sha256} due to '{e}'"
@@ -220,6 +221,8 @@ class ALIntezerApi(IntezerApi):
             # If you submit a file that Intezer doesn't support, you will get a 415 UNSUPPORTED_MEDIA_TYPE on this endpoint.
             if str(HTTPStatus.UNSUPPORTED_MEDIA_TYPE.value) in repr(e) or HTTPStatus.UNSUPPORTED_MEDIA_TYPE.name in repr(e):
                 return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
+            elif str(HTTPStatus.INTERNAL_SERVER_ERROR.value) in repr(e) or HTTPStatus.INTERNAL_SERVER_ERROR.name in repr(e):
+                return AnalysisStatusCode.FAILED.value
             else:
                 raise
 
@@ -235,7 +238,8 @@ class IntezerDynamic(ServiceBase):
         self.log.debug("IntezerDynamic service started...")
 
         if self.config.get("base_url") != BASE_URL and not self.config["is_on_premise"]:
-            self.log.warning(f"You are using a base url that is not {BASE_URL}, yet you do not have the 'is_on_premise' parameter set to true. Are you sure?")
+            self.log.warning(
+                f"You are using a base url that is not {BASE_URL}, yet you do not have the 'is_on_premise' parameter set to true. Are you sure?")
 
         self.client = ALIntezerApi(
             api_version=self.config.get("api_version", API_VERSION),
@@ -272,6 +276,10 @@ class IntezerDynamic(ServiceBase):
 
         if main_api_result.get("verdict") in Verdicts.NOT_SUPPORTED_VERDICTS.value:
             self.log.debug(f"Unsupported file type: {request.file_type}")
+            request.result = result
+            return
+        elif main_api_result.get("verdict") == AnalysisStatusCode.FAILED.value:
+            self.log.warning("The Intezer server is not feeling well :(")
             request.result = result
             return
 
@@ -329,19 +337,26 @@ class IntezerDynamic(ServiceBase):
         start_time = time()
 
         # Send the file
-        analysis_id = self.client.analyze_by_file(sha256=sha256, file_path=request.file_path, file_name=request.file_name, verify_file_support=True)
-        if analysis_id == Verdicts.FILE_TYPE_NOT_SUPPORTED.value:
-            return {"verdict": Verdicts.FILE_TYPE_NOT_SUPPORTED.value}
+        analysis_id = self.client.analyze_by_file(
+            sha256=sha256, file_path=request.file_path, file_name=request.file_name, verify_file_support=True)
+        if analysis_id in [Verdicts.FILE_TYPE_NOT_SUPPORTED.value, AnalysisStatusCode.FAILED.value]:
+            return {"verdict": analysis_id}
 
         status = AnalysisStatusCode.QUEUED
 
         analysis_timeout = self.config.get("analysis_period_in_seconds", DEFAULT_ANALYSIS_TIMEOUT)
         polling_period = self.config.get("polling_period_in_seconds", DEFAULT_POLLING_PERIOD)
 
-        while status not in COMPLETED_STATUSES or time() - start_time > analysis_timeout:
+        elapsed_time = time() - start_time
+        while status not in COMPLETED_STATUSES and elapsed_time < analysis_timeout:
             sleep(polling_period)
             resp = self.client.get_file_analysis_response(analysis_id, ignore_not_found=False)
             status = resp.json()["status"]
+            elapsed_time = time() - start_time
+
+        if elapsed_time > analysis_timeout:
+            self.log.warning(
+                f"Intezer was unable to scan the file {sha256} within the analysis timeout. Scan was stuck in '{status}'.")
 
         if status == AnalysisStatusCode.FAILED.value:
             self.log.warning(f"{sha256} caused Intezer to crash.")
@@ -480,7 +495,9 @@ class IntezerDynamic(ServiceBase):
         if sigs_res.subsections:
             parent_result_section.add_subsection(sigs_res)
 
-    def _process_ttp_data(self, ttp_data: List[Dict[str, str]], sig_res: ResultSection, ioc_table: ResultTableSection) -> None:
+    def _process_ttp_data(
+            self, ttp_data: List[Dict[str, str]],
+            sig_res: ResultSection, ioc_table: ResultTableSection) -> None:
         """
         This method handles the processing of signature marks
         :param ttp_data: The marks for the signature
@@ -518,7 +535,9 @@ class IntezerDynamic(ServiceBase):
             elif sig_res.body and f"\t{key}: {value}" not in sig_res.body:
                 sig_res.add_line(f"\t{key}: {value}")
 
-    def _handle_subanalyses(self, request: ServiceRequest, sha256: str, analysis_id: str, file_verdict_map: Dict[str, str], parent_section: ResultSection) -> None:
+    def _handle_subanalyses(self, request: ServiceRequest, sha256: str, analysis_id: str,
+                            file_verdict_map: Dict[str, str],
+                            parent_section: ResultSection) -> None:
         """
         This method handles the subanalyses for a given analysis ID
         :param request: The service request object
@@ -576,7 +595,8 @@ class IntezerDynamic(ServiceBase):
             extraction_method = sub["source"].replace("_", " ")
 
             if extraction_method != "root":
-                sub_kv_section = ResultKeyValueSection(f"Subanalysis report for {sub['sha256']}, extracted via {extraction_method}")
+                sub_kv_section = ResultKeyValueSection(
+                    f"Subanalysis report for {sub['sha256']}, extracted via {extraction_method}")
             else:
                 sub_kv_section = ResultKeyValueSection(f"Subanalysis report for {sub['sha256']}")
 
@@ -632,7 +652,10 @@ class IntezerDynamic(ServiceBase):
         if process_tree_section.body:
             parent_section.add_subsection(process_tree_section)
 
-    def _process_families(self, families: List[Dict[str, str]], sub_sha256: str, file_verdict_map: Dict[str, str], parent_section: ResultSection) -> None:
+    def _process_families(
+            self, families: List[Dict[str, str]],
+            sub_sha256: str, file_verdict_map: Dict[str, str],
+            parent_section: ResultSection) -> None:
         """
         This method handles the "families" list, cutting out boring details and assigning verdicts
         :param families: A list of details for families
@@ -653,7 +676,8 @@ class IntezerDynamic(ServiceBase):
                 family_section.add_tag("attribution.family", family["family_name"])
 
             # Overwrite value if not malicious
-            if family_type in MALICIOUS_FAMILY_TYPES and (sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] != Verdicts.MALICIOUS.value):
+            if family_type in MALICIOUS_FAMILY_TYPES and (
+                    sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] != Verdicts.MALICIOUS.value):
                 file_verdict_map[sub_sha256] = Verdicts.MALICIOUS.value
 
             # Only overwrite value if value is not already malicious
@@ -663,7 +687,11 @@ class IntezerDynamic(ServiceBase):
         if family_section.body:
             parent_section.add_subsection(family_section)
 
-    def _process_extraction_info(self, processes: List[Dict[str, Any]], process_path_set: Set[str], command_line_set: Set[str], so: SandboxOntology) -> None:
+    def _process_extraction_info(
+            self, processes: List[Dict[str, Any]],
+            process_path_set: Set[str],
+            command_line_set: Set[str],
+            so: SandboxOntology) -> None:
         """
         This method handles the processing of the extraction info process details
         :param processes: A list of processes
