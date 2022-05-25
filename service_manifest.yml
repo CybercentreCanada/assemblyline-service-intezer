@@ -1,5 +1,5 @@
 name: IntezerDynamic
-version: 4.2.0.stable1
+version: $SERVICE_TAG
 description: Fetch the Intezer results of the submitted file's sha256
 
 # TODO: From the user guide
