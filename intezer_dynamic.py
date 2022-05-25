@@ -274,12 +274,17 @@ class IntezerDynamic(ServiceBase):
         else:
             main_api_result = main_api_result_from_retrieval
 
-        if main_api_result.get("verdict") in Verdicts.NOT_SUPPORTED_VERDICTS.value:
+        verdict = main_api_result.get("verdict")
+        if verdict in Verdicts.NOT_SUPPORTED_VERDICTS.value:
             self.log.debug(f"Unsupported file type: {request.file_type}")
             request.result = result
             return
-        elif main_api_result.get("verdict") == AnalysisStatusCode.FAILED.value:
+        elif verdict == AnalysisStatusCode.FAILED.value:
             self.log.warning("The Intezer server is not feeling well :(")
+            request.result = result
+            return
+        elif verdict in Verdicts.TRUSTED_VERDICTS.value:
+            self.log.debug(f"The verdict was {verdict}. No need to report it.")
             request.result = result
             return
 
@@ -305,7 +310,7 @@ class IntezerDynamic(ServiceBase):
 
         # Setting heuristic here to avoid FPs
         if main_kv_section.subsections:
-            self._set_heuristic_by_verdict(main_kv_section, main_api_result["verdict"])
+            self._set_heuristic_by_verdict(main_kv_section, verdict)
 
         if main_kv_section.subsections or main_kv_section.heuristic:
             result.add_section(main_kv_section)
@@ -402,8 +407,6 @@ class IntezerDynamic(ServiceBase):
             result_section.set_heuristic(1)
         elif verdict in Verdicts.SUSPICIOUS_VERDICTS.value:
             result_section.set_heuristic(2)
-        elif verdict in Verdicts.TRUSTED_VERDICTS.value:
-            self.log.debug(f"The verdict was {verdict}. Can we do something with this?")
 
     def _process_iocs(
         self,
