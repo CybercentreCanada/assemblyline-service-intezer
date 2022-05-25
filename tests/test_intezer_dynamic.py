@@ -320,6 +320,9 @@ class TestIntezerDynamic:
         mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={"verdict": "failed"})
         intezer_dynamic_class_instance.execute(service_request)
 
+        mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={"verdict": "trusted"})
+        intezer_dynamic_class_instance.execute(service_request)
+
     @staticmethod
     def test_get_analysis_metadata(intezer_dynamic_class_instance, dummy_api_interface_class, mocker):
         from intezer_dynamic import ALIntezerApi
