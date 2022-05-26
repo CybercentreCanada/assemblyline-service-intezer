@@ -67,6 +67,8 @@ DEFAULT_POLLING_PERIOD = 5
 
 COMPLETED_STATUSES = [AnalysisStatusCode.FINISH.value, AnalysisStatusCode.FAILED.value, "succeeded"]
 
+CANNOT_EXTRACT_ARCHIVE = "Cannot extract archive"
+
 
 # From the user-guide
 class Verdicts(Enum):
@@ -226,6 +228,9 @@ class ALIntezerApi(IntezerApi):
                 return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
             elif str(HTTPStatus.INTERNAL_SERVER_ERROR.value) in repr(e) or HTTPStatus.INTERNAL_SERVER_ERROR.name in repr(e):
                 return AnalysisStatusCode.FAILED.value
+            elif CANNOT_EXTRACT_ARCHIVE in repr(e):
+                self.log.warning("Unable to extract archive, possibly because it is password-protected.")
+                return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
             else:
                 raise
 
