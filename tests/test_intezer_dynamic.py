@@ -627,44 +627,35 @@ class TestIntezerDynamic:
         assert dummy_request_class_instance.extracted[0]["name"] == "blah2.sample"
 
     @staticmethod
-    @pytest.mark.parametrize("families, file_verdict_map, correct_tags, correct_fvp",
+    @pytest.mark.parametrize("families, file_verdict_map, correct_fvp",
                              [([],
                                {},
-                               [],
                                {}),
                               ([{"blah": "blah", "family_type": "blah", "family_name": "blah"}],
                                {},
-                               [("attribution.family", "blah")],
                                {}),
                               ([{"family_id": "blah", "family_type": "blah", "family_name": "blah"}],
                                {},
-                               [("attribution.family", "blah")],
                                {}),
                               ([{"family_id": "blah", "family_type": "application", "family_name": "blah"}],
                                {},
-                               [],
                                {}),
                               ([{"family_id": "blah", "family_type": "malware", "family_name": "blah"}],
                                {},
-                               [("attribution.family", "blah")],
                                {"blah": "malicious"}),
                               ([{"family_id": "blah", "family_type": "malware", "family_name": "blah"}],
                                {"blah": "blah"},
-                               [("attribution.family", "blah")],
                                {"blah": "malicious"}),
                               ([{"family_id": "blah", "family_type": "malware", "family_name": "blah"}],
                                {"blah": "malicious"},
-                               [("attribution.family", "blah")],
                                {"blah": "malicious"}),
                               ([{"family_id": "blah", "family_type": "packer", "family_name": "blah"}],
                                {},
-                               [("attribution.family", "blah")],
                                {"blah": "suspicious"}),
                               ([{"family_id": "blah", "family_type": "packer", "family_name": "blah"}],
                                {"blah": "malicious"},
-                               [("attribution.family", "blah")],
                                {"blah": "malicious"}), ])
-    def test_process_families(families, file_verdict_map, correct_tags, correct_fvp, intezer_dynamic_class_instance):
+    def test_process_families(families, file_verdict_map, correct_fvp, intezer_dynamic_class_instance):
         from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
 
         parent_section = ResultSection("blah")
@@ -678,8 +669,6 @@ class TestIntezerDynamic:
                 if "family_id" in family:
                     family.pop("family_id")
                 correct_result_section.add_row(TableRow(**family))
-            for tag in correct_tags:
-                correct_result_section.add_tag(tag[0], tag[1])
 
             assert check_section_equality(parent_section.subsections[0], correct_result_section)
             assert file_verdict_map == correct_fvp
