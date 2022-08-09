@@ -21,16 +21,6 @@ SAFE_FAMILIES = {
         "AnyDesk Software GmbH",
         "Wget",
     ],
-    "installer": [
-        "InstallShield",
-        "NSIS",
-        "InnoSetup",
-        "WEXTRACT",
-        "InstallAnywhere",
-        "Advanced",
-        "7-Zip.SFX",
-        "WinRAR.SFX",
-    ],
     "packer": [
         "UPX",
     ]
