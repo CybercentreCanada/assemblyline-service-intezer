@@ -47,7 +47,7 @@ UNINTERESTING_FAMILY_KEYS = ["family_id"]
 
 FAMILIES_TO_NOT_TAG = ["application", "library"]
 MALICIOUS_FAMILY_TYPES = ["malware"]
-FAMILY_TYPES_OF_INTEREST = ["administration_tool", "installer", "packer"]
+FAMILY_TYPES_OF_INTEREST = ["administration_tool", "packer"]
 
 TTP_SEVERITY_TRANSLATION = {
     1: 10,
