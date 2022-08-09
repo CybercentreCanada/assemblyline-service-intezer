@@ -377,6 +377,10 @@ class TestIntezerDynamic:
         intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "suspicious")
         assert result_section.heuristic.heur_id == 2
 
+        result_section = ResultSection("blah")
+        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "interesting")
+        assert result_section.heuristic.heur_id == 3
+
     @staticmethod
     def test_process_iocs(intezer_dynamic_class_instance, dummy_api_interface_class, mocker):
         from intezer_dynamic import ALIntezerApi
@@ -626,10 +630,13 @@ class TestIntezerDynamic:
                                {"blah": "malicious"}),
                               ([{"family_id": "blah", "family_type": "packer", "family_name": "blah"}],
                                {},
-                               {"blah": "suspicious"}),
+                               {"blah": "interesting"}),
                               ([{"family_id": "blah", "family_type": "packer", "family_name": "blah"}],
                                {"blah": "malicious"},
-                               {"blah": "malicious"}), ])
+                               {"blah": "malicious"}),
+                              ([{"family_id": "blah", "family_type": "packer", "family_name": "UPX"}],
+                               {},
+                               {}), ])
     def test_process_families(families, file_verdict_map, correct_fvp, intezer_dynamic_class_instance):
         from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
 

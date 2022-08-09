@@ -52,6 +52,11 @@ heuristics:
     score: 500
     filetype: .*
     description: Intezer considers this file suspicious
+  - heur_id: 3
+    name: Family Type of Interest
+    score: 100
+    filetype: .*
+    description: Intezer identified a file (or sub-file) that is associated with a family type of interest
   - heur_id: 4
     name: Generic signature raised
     score: 0

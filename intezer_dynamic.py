@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Set
 from intezer_sdk.api import IntezerApi
 from intezer_sdk.errors import UnsupportedOnPremiseVersion, ServerError
 from intezer_sdk.consts import OnPremiseVersion, BASE_URL, API_VERSION, AnalysisStatusCode
+from safe_families import SAFE_FAMILIES
 from signatures import get_attack_ids_for_signature_name, get_heur_id_for_signature_name, GENERIC_HEURISTIC_ID
 
 from assemblyline.common.str_utils import truncate
@@ -46,7 +47,7 @@ UNINTERESTING_FAMILY_KEYS = ["family_id"]
 
 FAMILIES_TO_NOT_TAG = ["application", "library"]
 MALICIOUS_FAMILY_TYPES = ["malware"]
-SUSPICIOUS_FAMILY_TYPES = ["administration_tool", "installer", "packer"]
+FAMILY_TYPES_OF_INTEREST = ["administration_tool", "packer"]
 
 TTP_SEVERITY_TRANSLATION = {
     1: 10,
@@ -94,6 +95,10 @@ class Verdicts(Enum):
     SUSPICIOUS = "suspicious"
     SUSPICIOUS_VERDICTS = [ADMINISTRATION_TOOL, KNOWN_ADMINISTRATION_TOOL, PACKED, PROBABLY_PACKED, SCRIPT, SUSPICIOUS]
 
+    # Of Interest
+    FAMILY_TYPE_OF_INTEREST = "interesting"
+    FAMILY_TYPE_OF_INTEREST_VERDICTS = [FAMILY_TYPE_OF_INTEREST]
+
     # Unknown
     UNIQUE = "unique"
     NO_GENES = "no_genes"
@@ -115,7 +120,7 @@ class Verdicts(Enum):
     NEUTRAL = "neutral"
     NEUTRAL_VERDICTS = [NEUTRAL]
 
-    INTERESTING_VERDICTS = MALICIOUS_VERDICTS + SUSPICIOUS_VERDICTS
+    INTERESTING_VERDICTS = MALICIOUS_VERDICTS + SUSPICIOUS_VERDICTS + FAMILY_TYPE_OF_INTEREST_VERDICTS
     UNINTERESTING_VERDICTS = NEUTRAL_VERDICTS + NOT_SUPPORTED_VERDICTS + UNKNOWN_VERDICTS + TRUSTED_VERDICTS
 
 
@@ -419,6 +424,8 @@ class IntezerDynamic(ServiceBase):
             result_section.set_heuristic(1)
         elif verdict in Verdicts.SUSPICIOUS_VERDICTS.value:
             result_section.set_heuristic(2)
+        elif verdict in Verdicts.FAMILY_TYPE_OF_INTEREST_VERDICTS.value:
+            result_section.set_heuristic(3)
 
     def _process_iocs(
         self,
@@ -687,6 +694,7 @@ class IntezerDynamic(ServiceBase):
             )
             family_section.add_row(TableRow(**processed_family))
             family_type = family["family_type"]
+            family_name = family["family_name"]
             # TODO: Do not tag these sub families, for the time being at least
             # if family_type not in FAMILIES_TO_NOT_TAG:
             #     family_section.add_tag("attribution.family", family["family_name"])
@@ -697,8 +705,8 @@ class IntezerDynamic(ServiceBase):
                 file_verdict_map[sub_sha256] = Verdicts.MALICIOUS.value
 
             # Only overwrite value if value is not already malicious
-            elif family_type in SUSPICIOUS_FAMILY_TYPES and (sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] not in Verdicts.MALICIOUS_VERDICTS.value):
-                file_verdict_map[sub_sha256] = Verdicts.SUSPICIOUS.value
+            elif family_type in FAMILY_TYPES_OF_INTEREST and family_name not in SAFE_FAMILIES[family_type] and (sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] not in Verdicts.MALICIOUS_VERDICTS.value):
+                file_verdict_map[sub_sha256] = Verdicts.FAMILY_TYPE_OF_INTEREST.value
 
         if family_section.body:
             parent_section.add_subsection(family_section)
