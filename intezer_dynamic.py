@@ -24,6 +24,7 @@ from assemblyline_v4_service.common.result import (
     TableRow,
 )
 from assemblyline_v4_service.common.tag_helper import add_tag
+from assemblyline_v4_service.common.task import MaxExtractedExceeded
 
 global_safelist: Optional[Dict[str, Dict[str, List[str]]]] = None
 
@@ -657,12 +658,16 @@ class IntezerDynamic(ServiceBase):
                     )
                     if file_was_downloaded:
                         path = f"{self.working_directory}/{sub_sha256}.sample"
-                        request.add_extracted(
-                            path,
-                            f"{sub_sha256}.sample",
-                            f"Extracted via {extraction_method}",
-                        )
-                        self.log.debug(f"Added {sub_sha256}.sample as an extracted file.")
+                        try:
+                            request.add_extracted(
+                                path,
+                                f"{sub_sha256}.sample",
+                                f"Extracted via {extraction_method}",
+                            )
+                            self.log.debug(f"Added {sub_sha256}.sample as an extracted file.")
+                        except MaxExtractedExceeded as e:
+                            self.log.debug(f"Skipped adding {sub_sha256}.sample as an extracted file due to {e}.")
+                            can_we_download_files = False
                     else:
                         can_we_download_files = False
 
