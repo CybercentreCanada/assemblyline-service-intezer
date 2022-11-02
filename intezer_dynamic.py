@@ -392,6 +392,12 @@ class ALIntezerApi(IntezerApi):
                 elif CANNOT_EXTRACT_ARCHIVE in repr(e):
                     self.log.warning(f"Unable to extract archive for SHA256 {sha256}, possibly because it is password-protected.")
                     return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
+                # If you submit a file that is too big for Intezer, you will get a 413 REQUEST_ENTITY_TOO_LARGE on this endpoint.
+                elif str(HTTPStatus.REQUEST_ENTITY_TOO_LARGE.value) in repr(e) or HTTPStatus.REQUEST_ENTITY_TOO_LARGE.name in repr(e):
+                    self.log.debug(
+                        f"Unable to analyze file for SHA256 {sha256} due to '{e}'."
+                    )
+                    return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
                 else:
                     if not logged:
                         self.log.error(
