@@ -1,6 +1,6 @@
 from enum import Enum
 from http import HTTPStatus
-from requests import HTTPError
+from requests import ConnectionError, HTTPError
 from time import sleep, time
 from typing import Any, Dict, List, Optional, Set
 
@@ -140,105 +140,267 @@ class ALIntezerApi(IntezerApi):
                             file_hash: str,
                             private_only: bool = False,
                             **additional_parameters) -> Optional[Dict]:
-        try:
-            return IntezerApi.get_latest_analysis(
-                self=self,
-                file_hash=file_hash,
-                private_only=private_only,
-                additional_parameters=additional_parameters
-            )
-        except HTTPError as e:
-            self.log.debug(
-                f"Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'"
-            )
-            # Occasionally an analysis fails, and HTTPError.GONE is raised
-            if str(HTTPStatus.GONE.value) in repr(e) or HTTPStatus.GONE.name in repr(e):
-                return None
-            else:
-                raise
+        # We will try to connect with the REST API... NO MATTER WHAT
+        logged = False
+        while True:
+            try:
+                return IntezerApi.get_latest_analysis(
+                    self=self,
+                    file_hash=file_hash,
+                    private_only=private_only,
+                    additional_parameters=additional_parameters
+                )
+            except ConnectionError as e:
+                if not logged:
+                    self.log.error(
+                        "The intezer web service is most likely down. "
+                        f"Indicator: Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'."
+                    )
+                    logged = True
+                sleep(5)
+                continue
+            except HTTPError as e:
+                # Occasionally an analysis fails, and HTTPError.GONE is raised
+                if str(HTTPStatus.GONE.value) in repr(e) or HTTPStatus.GONE.name in repr(e):
+                    self.log.debug(
+                        f"Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'."
+                    )
+                    return None
+                else:
+                    if not logged:
+                        self.log.error(
+                            "The intezer web service is most likely down. "
+                            f"Indicator: Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'."
+                        )
+                        logged = True
+                    sleep(5)
+                    continue
 
     # Overriding the class method to handle if the HTTPError exists
     def get_iocs(self, analysis_id: str) -> Dict[str, List[Dict[str, str]]]:
-        try:
-            return IntezerApi.get_iocs(self=self, analyses_id=analysis_id)
-        except HTTPError as e:
-            self.log.debug(
-                f"Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'"
-            )
-            # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
-            if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
-                return {"files": [], "network": []}
-            else:
-                raise
+        # We will try to connect with the REST API... NO MATTER WHAT
+        logged = False
+        while True:
+            try:
+                return IntezerApi.get_iocs(self=self, analyses_id=analysis_id)
+            except ConnectionError as e:
+                if not logged:
+                    self.log.error(
+                        "The intezer web service is most likely down. "
+                        f"Indicator: Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'."
+                    )
+                    logged = True
+                sleep(5)
+                continue
+            except HTTPError as e:
+                # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
+                if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
+                    self.log.debug(
+                        f"Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'."
+                    )
+                    return {"files": [], "network": []}
+                else:
+                    if not logged:
+                        self.log.error(
+                            "The intezer web service is most likely down. "
+                            f"Indicator: Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'."
+                        )
+                        logged = True
+                    sleep(5)
+                    continue
 
     # Overriding the class method to handle if the HTTPError or UnsupportedOnPremiseVersion exists
     def get_dynamic_ttps(self, analysis_id: str) -> List[Dict[str, str]]:
-        try:
-            return IntezerApi.get_dynamic_ttps(self=self, analyses_id=analysis_id)
-        except HTTPError as e:
-            self.log.debug(
-                f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'"
-            )
-            # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
-            if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
+        # We will try to connect with the REST API... NO MATTER WHAT
+        logged = False
+        while True:
+            try:
+                return IntezerApi.get_dynamic_ttps(self=self, analyses_id=analysis_id)
+            except ConnectionError as e:
+                if not logged:
+                    self.log.error(
+                        "The intezer web service is most likely down. "
+                        f"Indicator: Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'."
+                    )
+                    logged = True
+                sleep(5)
+                continue
+            except HTTPError as e:
+                # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
+                if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
+                    self.log.debug(
+                        f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'."
+                    )
+                    return []
+                else:
+                    if not logged:
+                        self.log.error(
+                            "The intezer web service is most likely down. "
+                            f"Indicator: Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'."
+                        )
+                        logged = True
+                    sleep(5)
+                    continue
+            except UnsupportedOnPremiseVersion as e:
+                self.log.debug(
+                    f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'."
+                )
                 return []
-            else:
-                raise
-        except UnsupportedOnPremiseVersion as e:
-            self.log.debug(
-                f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'"
-            )
-            return []
 
     # Overriding the class method to handle if the HTTPError exists
     def get_sub_analyses_by_id(self, analysis_id: str) -> List[Dict[str, Any]]:
-        try:
-            return IntezerApi.get_sub_analyses_by_id(self=self, analysis_id=analysis_id)
-        except HTTPError as e:
-            self.log.debug(
-                f"Unable to get sub_analyses for analysis ID {analysis_id} due to '{e}'"
-            )
-            return []
+        # We will try to connect with the REST API... NO MATTER WHAT
+        logged = False
+        while True:
+            try:
+                return IntezerApi.get_sub_analyses_by_id(self=self, analysis_id=analysis_id)
+            except ConnectionError as e:
+                if not logged:
+                    self.log.error(
+                        "The intezer web service is most likely down. "
+                        f"Indicator: Unable to get sub_analyses for analysis ID {analysis_id} due to '{e}'."
+                    )
+                    logged = True
+                sleep(5)
+                continue
+            except HTTPError as e:
+                self.log.debug(
+                    f"Unable to get sub_analyses for analysis ID {analysis_id} due to '{e}'."
+                )
+                return []
+
+    # Overriding the class method to handle if the network connection cannot be made
+    def get_sub_analysis_code_reuse_by_id(self, analysis_id: str, sub_analysis_id: str) -> Optional[Dict[str, Any]]:
+        # We will try to connect with the REST API... NO MATTER WHAT
+        logged = False
+        while True:
+            try:
+                return IntezerApi.get_sub_analysis_code_reuse_by_id(
+                    self=self, composed_analysis_id=analysis_id, sub_analysis_id=sub_analysis_id
+                )
+            except ConnectionError as e:
+                if not logged:
+                    self.log.error(
+                        "The intezer web service is most likely down. "
+                        f"Indicator: Unable to get sub_analyses code re-use for analysis ID {analysis_id} due to '{e}'."
+                    )
+                    logged = True
+                sleep(5)
+                continue
+            except HTTPError as e:
+                self.log.debug(
+                    f"Unable to get sub_analyses code re-use for analysis ID {analysis_id} due to '{e}'."
+                )
+                return None
+
+    # Overriding the class method to handle if the network connection cannot be made
+    def get_sub_analysis_metadata_by_id(self, analysis_id: str, sub_analysis_id: str) -> Dict[str, Any]:
+        # We will try to connect with the REST API... NO MATTER WHAT
+        logged = False
+        while True:
+            try:
+                return IntezerApi.get_sub_analysis_metadata_by_id(
+                    self=self, composed_analysis_id=analysis_id, sub_analysis_id=sub_analysis_id
+                )
+            except ConnectionError as e:
+                if not logged:
+                    self.log.error(
+                        "The intezer web service is most likely down. "
+                        f"Indicator: Unable to get sub_analyses metadata for analysis ID {analysis_id} and sub-analysis ID {sub_analysis_id} due to '{e}'."
+                    )
+                    logged = True
+                sleep(5)
+                continue
+            except HTTPError as e:
+                self.log.debug(
+                    f"Unable to get sub_analyses metadata for analysis ID {analysis_id} and sub-analysis ID {sub_analysis_id} due to '{e}'."
+                )
+                return {}
+
 
     # Overriding the class method to handle if the HTTPError exists
     def download_file_by_sha256(self, sha256: str, dir_path: str) -> bool:
-        try:
-            IntezerApi.download_file_by_sha256(
-                self=self, sha256=sha256, path=dir_path
-            )
-            return True
-        except HTTPError as e:
-            self.log.debug(
-                f"Unable to download file for SHA256 {sha256} due to '{e}'"
-            )
-            # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
-            if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
+        # We will try to connect with the REST API... NO MATTER WHAT
+        logged = False
+        while True:
+            try:
+                IntezerApi.download_file_by_sha256(
+                    self=self, sha256=sha256, path=dir_path
+                )
+                return True
+            except ConnectionError as e:
+                if not logged:
+                    self.log.error(
+                        "The intezer web service is most likely down. "
+                        f"Indicator: Unable to download file for SHA256 {sha256} due to '{e}'."
+                    )
+                    logged = True
+                sleep(5)
+                continue
+            except HTTPError as e:
+                # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
+                if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
+                    self.log.debug(
+                        f"Unable to download file for SHA256 {sha256} due to '{e}'."
+                    )
+                    return False
+                else:
+                    if not logged:
+                        self.log.error(
+                            "The intezer web service is most likely down. "
+                            f"Indicator: Unable to download file for SHA256 {sha256} due to '{e}'."
+                        )
+                        logged = True
+                    sleep(5)
+                    continue
+            except FileExistsError as e:
+                # Duplicate file
+                self.log.debug(
+                    f"Unable to download file for SHA256 {sha256} due to '{e}'."
+                )
                 return False
-            else:
-                raise
-        except FileExistsError:
-            # Duplicate file
-            pass
 
     # Overriding the class method to handle if the ServerError exists
     def analyze_by_file(self, sha256: str, file_path: str, file_name: str, verify_file_support: bool) -> str:
-        try:
-            return IntezerApi.analyze_by_file(
-                self=self, file_path=file_path, file_name=file_name, verify_file_support=verify_file_support)
-        except ServerError as e:
-            self.log.debug(
-                f"Unable to analyze file for SHA256 {sha256} due to '{e}'"
-            )
-            # If you submit a file that Intezer doesn't support, you will get a 415 UNSUPPORTED_MEDIA_TYPE on this endpoint.
-            if str(HTTPStatus.UNSUPPORTED_MEDIA_TYPE.value) in repr(e) or HTTPStatus.UNSUPPORTED_MEDIA_TYPE.name in repr(e):
-                return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
-            elif str(HTTPStatus.INTERNAL_SERVER_ERROR.value) in repr(e) or HTTPStatus.INTERNAL_SERVER_ERROR.name in repr(e):
-                return AnalysisStatusCode.FAILED.value
-            elif CANNOT_EXTRACT_ARCHIVE in repr(e):
-                self.log.warning("Unable to extract archive, possibly because it is password-protected.")
-                return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
-            else:
-                raise
+        # We will try to connect with the REST API... NO MATTER WHAT
+        logged = False
+        while True:
+            try:
+                return IntezerApi.analyze_by_file(
+                    self=self, file_path=file_path, file_name=file_name, verify_file_support=verify_file_support)
+            except ConnectionError as e:
+                if not logged:
+                    self.log.error(
+                        "The intezer web service is most likely down. "
+                        f"Indicator: Unable to analyze file for SHA256 {sha256} due to '{e}'."
+                    )
+                    logged = True
+                sleep(5)
+                continue
+            except ServerError as e:
+                # If you submit a file that Intezer doesn't support, you will get a 415 UNSUPPORTED_MEDIA_TYPE on this endpoint.
+                if str(HTTPStatus.UNSUPPORTED_MEDIA_TYPE.value) in repr(e) or HTTPStatus.UNSUPPORTED_MEDIA_TYPE.name in repr(e):
+                    self.log.debug(
+                        f"Unable to analyze file for SHA256 {sha256} due to '{e}'."
+                    )
+                    return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
+                elif str(HTTPStatus.INTERNAL_SERVER_ERROR.value) in repr(e) or HTTPStatus.INTERNAL_SERVER_ERROR.name in repr(e):
+                    self.log.debug(
+                        f"Unable to analyze file for SHA256 {sha256} due to '{e}'."
+                    )
+                    return AnalysisStatusCode.FAILED.value
+                elif CANNOT_EXTRACT_ARCHIVE in repr(e):
+                    self.log.warning(f"Unable to extract archive for SHA256 {sha256}, possibly because it is password-protected.")
+                    return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
+                else:
+                    if not logged:
+                        self.log.error(
+                            "The intezer web service is most likely down. "
+                            f"Indicator: Unable to analyze file for SHA256 {sha256} due to '{e}'."
+                        )
+                        logged = True
+                    sleep(5)
+                    continue
 
 
 class IntezerDynamic(ServiceBase):
@@ -326,9 +488,8 @@ class IntezerDynamic(ServiceBase):
             self._process_ttps(analysis_id, main_kv_section)
         self._handle_subanalyses(request, sha256, analysis_id, file_verdict_map, main_kv_section)
 
-        # Setting heuristic here to avoid FPs
-        if main_kv_section.subsections:
-            self._set_heuristic_by_verdict(main_kv_section, verdict)
+        # Setting heuristic here to avoid FPs. An analysis should not require sub_analyses to get a heuristic assigned.
+        self._set_heuristic_by_verdict(main_kv_section, verdict)
 
         if main_kv_section.subsections or main_kv_section.heuristic:
             result.add_section(main_kv_section)
