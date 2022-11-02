@@ -356,6 +356,10 @@ class TestIntezerDynamic:
         assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
 
         mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(
+            413, dummy_get_response_class("blah")))
+        assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+
+        mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(
             500, dummy_get_response_class("blah")))
         assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
 
@@ -1039,3 +1043,7 @@ class TestALIntezerApi:
             p1.join(timeout=2)
             p1.terminate()
             assert p1.exitcode is None
+
+            # Case 7: "Good" ServerError
+            m.post(f"{dummy_al_intezer_api_instance.full_url}/analyze", exc=ServerError(413, dummy_get_response_class("blah")))
+            assert dummy_al_intezer_api_instance.analyze_by_file(sha256, file_path, file_name, verify_file_support) == "file_type_not_supported"
