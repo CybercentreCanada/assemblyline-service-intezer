@@ -11,9 +11,10 @@ from safe_families import SAFE_FAMILIES
 from signatures import get_attack_ids_for_signature_name, get_heur_id_for_signature_name, GENERIC_HEURISTIC_ID
 
 from assemblyline.common.str_utils import truncate
+from assemblyline.odm.models.ontology.results.process import Process as ProcessModel
 from assemblyline_v4_service.common.api import ServiceAPIError
 from assemblyline_v4_service.common.base import ServiceBase
-from assemblyline_v4_service.common.dynamic_service_helper import extract_iocs_from_text_blob, SandboxOntology
+from assemblyline_v4_service.common.dynamic_service_helper import extract_iocs_from_text_blob, MIN_TIME, OntologyResults, Process
 from assemblyline_v4_service.common.request import ServiceRequest
 from assemblyline_v4_service.common.result import (
     Result,
@@ -739,7 +740,7 @@ class IntezerDynamic(ServiceBase):
         result section will be added to, if applicable
         :return: None
         """
-        so = SandboxOntology()
+        so = OntologyResults()
 
         # This boolean is used to determine if we should try to download another file
         can_we_download_files = True
@@ -887,7 +888,7 @@ class IntezerDynamic(ServiceBase):
             self, processes: List[Dict[str, Any]],
             process_path_set: Set[str],
             command_line_set: Set[str],
-            so: SandboxOntology) -> None:
+            so: OntologyResults) -> None:
         """
         This method handles the processing of the extraction info process details
         :param processes: A list of processes
@@ -897,23 +898,38 @@ class IntezerDynamic(ServiceBase):
         :return: None
         """
         for item in processes:
-            p = so.create_process(
-                pid=item["process_id"],
-                image=item["process_path"],
-                ppid=item["parent_process_id"],
-            )
-            process_path_set.add(item["process_path"])
-            so.add_process(p)
-
+            command_line = None
             if item["process_path"] != item["module_path"]:
                 self.log.debug(
                     f"Investigate! process_path: {item['process_path']} != module_path: {item['module_path']}"
                 )
-                process_path_set.add(item["module_path"])
                 command_line = f"{item['process_path']} {item['module_path']}"
+                process_path_set.add(item["module_path"])
                 command_line_set.add(command_line)
-                so.update_process(
-                    command_line=command_line,
-                    pid=item["process_id"],
-                    start_time=float("-inf")
+
+            p = so.get_process_by_pid_and_time(item["process_id"], MIN_TIME)
+            if p:
+                p.update(command_line=command_line)
+            else:
+                p_oid = ProcessModel.get_oid(
+                    {
+                        "pid": item["process_id"],
+                        "ppid": item["parent_process_id"],
+                        "image": item["process_path"],
+                        "command_line": command_line,
+                    }
                 )
+                p = so.create_process(
+                    pid=item["process_id"],
+                    image=item["process_path"],
+                    ppid=item["parent_process_id"],
+                    objectid=OntologyResults.create_objectid(
+                        tag=Process.create_objectid_tag(item["process_path"],),
+                        ontology_id=p_oid,
+                        service_name="IntezerStatic"
+                    ),
+                    command_line=command_line,
+                    start_time=MIN_TIME
+                )
+                so.add_process(p)
+            process_path_set.add(item["process_path"])
