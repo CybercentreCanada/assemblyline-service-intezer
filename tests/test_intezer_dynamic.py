@@ -231,6 +231,7 @@ def dummy_al_intezer_api_instance(mocker):
             on_premise_version=False
         )
     al_intezer_api.set_logger(getLogger("assemblyline"))
+    al_intezer_api.set_retry_forever(True)
     mocker.patch.object(al_intezer_api, "_set_access_token", return_value=True)
     yield al_intezer_api
 
@@ -819,6 +820,11 @@ class TestALIntezerApi:
     def test_set_logger(dummy_al_intezer_api_instance):
         dummy_al_intezer_api_instance.set_logger("blah")
         assert dummy_al_intezer_api_instance.log == "blah"
+
+    @staticmethod
+    def test_set_retry_forever(dummy_al_intezer_api_instance):
+        dummy_al_intezer_api_instance.set_retry_forever(False)
+        assert dummy_al_intezer_api_instance.retry_forever is False
 
     @staticmethod
     def test_get_latest_analysis(dummy_al_intezer_api_instance):
