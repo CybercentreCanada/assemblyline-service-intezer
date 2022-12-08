@@ -22,6 +22,7 @@ If you are using Intezer's Dynamic Execution module, then set the service timeou
 * **api_key**: This is the 36 character key provided to you by [Intezer](https://www.intezer.com/blog/malware-analysis/api-intezer-analyze-community/).
 * **private_only**: This is a flag that will only return private submissions on the Intezer Analyze system, if selected.
 * **is_on_premise**: This is a flag used for indicating if the Intezer Analyze system is on-premise, rather than the cloud API.
+* **retry_forever**: This is a flag used for indicating if the service should poll the Intezer Analyze system until it gets a response. If set to `false`, the service will raise an exception immediately.
 * **polling_period_in_seconds**: This integer is the time to wait between status checks for the current analysis.
 * **analysis_timeout_in_seconds**: This integer is the time to wait for an analysis to complete.
 
