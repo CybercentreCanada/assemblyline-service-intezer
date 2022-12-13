@@ -856,6 +856,10 @@ class TestALIntezerApi:
             p1.terminate()
             assert p1.exitcode is None
 
+            # Case 5: "Good" HTTPError
+            m.get(f"{dummy_al_intezer_api_instance.full_url}/files/{file_hash}", exc=HTTPError(404))
+            assert dummy_al_intezer_api_instance.get_latest_analysis(file_hash, private_only) is None
+
     @staticmethod
     def test_get_iocs(dummy_al_intezer_api_instance):
         analysis_id = "blah"
@@ -884,6 +888,10 @@ class TestALIntezerApi:
             p1.join(timeout=2)
             p1.terminate()
             assert p1.exitcode is None
+
+            # Case 5: "Good" HTTPError
+            m.get(f"{dummy_al_intezer_api_instance.full_url}/analyses/{analysis_id}/iocs", exc=HTTPError(404))
+            assert dummy_al_intezer_api_instance.get_iocs(analysis_id) == {"files": [], "network": []}
 
     @staticmethod
     def test_get_dynamic_ttps(dummy_al_intezer_api_instance):
@@ -918,6 +926,10 @@ class TestALIntezerApi:
 
             # Case 5: UnsupportedOnPremiseVersion
             m.get(f"{dummy_al_intezer_api_instance.full_url}/analyses/{analysis_id}/dynamic-ttps", exc=UnsupportedOnPremiseVersion("blah"))
+            assert dummy_al_intezer_api_instance.get_dynamic_ttps(analysis_id) == []
+
+            # Case 6: "Good" HTTPError
+            m.get(f"{dummy_al_intezer_api_instance.full_url}/analyses/{analysis_id}/dynamic-ttps", exc=HTTPError(404))
             assert dummy_al_intezer_api_instance.get_dynamic_ttps(analysis_id) == []
 
     @staticmethod
@@ -1017,6 +1029,10 @@ class TestALIntezerApi:
 
             # Case 5: FileExistsError
             m.get(f"{dummy_al_intezer_api_instance.full_url}/files/{analysis_id}/download", exc=FileExistsError("blah"))
+            assert dummy_al_intezer_api_instance.download_file_by_sha256(analysis_id, dir_path) is False
+
+            # Case 6: "Good" HTTPError
+            m.get(f"{dummy_al_intezer_api_instance.full_url}/files/{analysis_id}/download", exc=HTTPError(404))
             assert dummy_al_intezer_api_instance.download_file_by_sha256(analysis_id, dir_path) is False
 
     @staticmethod
