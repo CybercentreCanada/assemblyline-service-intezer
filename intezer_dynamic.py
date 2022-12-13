@@ -173,6 +173,13 @@ class ALIntezerApi(IntezerApi):
                         f"Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'."
                     )
                     return None
+                # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
+                # per https://github.com/CybercentreCanada/assemblyline-service-intezer-dynamic/issues/31
+                elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
+                    self.log.debug(
+                        f"Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'."
+                    )
+                    return None
                 else:
                     if not logged:
                         self.log.error(
@@ -212,6 +219,13 @@ class ALIntezerApi(IntezerApi):
                         f"Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'."
                     )
                     return {"files": [], "network": []}
+                # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
+                # per https://github.com/CybercentreCanada/assemblyline-service-intezer-dynamic/issues/31
+                elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
+                    self.log.debug(
+                        f"Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'."
+                    )
+                    return {"files": [], "network": []}
                 else:
                     if not logged:
                         self.log.error(
@@ -247,6 +261,13 @@ class ALIntezerApi(IntezerApi):
             except HTTPError as e:
                 # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
                 if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
+                    self.log.debug(
+                        f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'."
+                    )
+                    return []
+                # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
+                # per https://github.com/CybercentreCanada/assemblyline-service-intezer-dynamic/issues/31
+                elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
                     self.log.debug(
                         f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'."
                     )
@@ -374,6 +395,13 @@ class ALIntezerApi(IntezerApi):
             except HTTPError as e:
                 # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
                 if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
+                    self.log.debug(
+                        f"Unable to download file for SHA256 {sha256} due to '{e}'."
+                    )
+                    return False
+                # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
+                # per https://github.com/CybercentreCanada/assemblyline-service-intezer-dynamic/issues/31
+                elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
                     self.log.debug(
                         f"Unable to download file for SHA256 {sha256} due to '{e}'."
                     )
