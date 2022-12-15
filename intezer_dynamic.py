@@ -891,7 +891,7 @@ class IntezerDynamic(ServiceBase):
                     sub_kv_section, file_verdict_map.get(sub_sha256)
                 )
 
-                if can_we_download_files:
+                if can_we_download_files or self.config.get("try_to_download_every_file", False):
                     file_was_downloaded = self.client.download_file_by_sha256(
                         sub_sha256, self.working_directory
                     )
