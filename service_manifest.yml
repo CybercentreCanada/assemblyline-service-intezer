@@ -2,7 +2,7 @@ name: Intezer
 version: $SERVICE_TAG
 description: Fetch the Intezer results of the submitted file's sha256
 # These are the file type categories that we have found Intezer Analyze hits on.
-accepts: android/.*|executable/.*|document/installer/windows
+accepts: android/.*|executable/windows/.*|executable/linux/.*|document/installer/windows
 rejects: empty|metadata/.*
 
 stage: CORE
