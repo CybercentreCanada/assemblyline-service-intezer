@@ -1,17 +1,8 @@
-name: IntezerDynamic
+name: Intezer
 version: $SERVICE_TAG
 description: Fetch the Intezer results of the submitted file's sha256
-
-# TODO: From the user guide
-# The following file formats are currently supported:
-# • Windows Executable Files (PE) – exe, .dll, .sys – native x86, native x64 and .NET.
-# • Linux Executable Files (ELF) – native x86, native x64, ARM32, ARM64
-# • Compressed files that contain one file - Zip, RAR, TAR, 7-Zip
-# • Android applications (APK)• Installers - msi, trusted installer, Inno setup...
-# • Microsoft Office - doc, xls, ppt, etc.
-# • PDF
-# • Scripts - powershell, vbs, js
-accepts: .*
+# These are the file type categories that we have found Intezer Analyze hits on.
+accepts: android/.*|executable/.*|document/installer/windows
 rejects: empty|metadata/.*
 
 stage: CORE
@@ -33,11 +24,17 @@ config:
   private_only: false
   is_on_premise: false
   retry_forever: true
+  allow_dynamic_submit: true
   polling_period_in_seconds: 5
   analysis_timeout_in_seconds: 60
   try_to_download_every_file: false
 
 submission_params:
+  - default: true
+    name: dynamic_submit
+    type: bool
+    value: true
+
   - default: ""
     name: analysis_id
     type: str
@@ -102,6 +99,6 @@ heuristics:
 
 docker_config:
   allow_internet_access: true
-  image: ${REGISTRY}cccs/assemblyline-service-intezer-dynamic:$SERVICE_TAG
+  image: ${REGISTRY}cccs/assemblyline-service-intezer:$SERVICE_TAG
   cpu_cores: 0.5
   ram_mb: 256

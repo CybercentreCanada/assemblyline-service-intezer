@@ -17,7 +17,7 @@ samples = [
     dict(
         sid=1,
         metadata={},
-        service_name='intezer_dynamic',
+        service_name='intezer',
         service_config={},
         fileinfo=dict(
             magic='ASCII text, with no line terminators',
@@ -165,11 +165,11 @@ def remove_tmp_manifest():
 
 
 @pytest.fixture
-def intezer_dynamic_class_instance():
+def intezer_class_instance():
     create_tmp_manifest()
     try:
-        from intezer_dynamic import IntezerDynamic
-        yield IntezerDynamic()
+        from intezer import Intezer
+        yield Intezer()
     finally:
         remove_tmp_manifest()
 
@@ -219,7 +219,7 @@ def dummy_request_class():
 
 @pytest.fixture
 def dummy_al_intezer_api_instance(mocker):
-    from intezer_dynamic import ALIntezerApi
+    from intezer import ALIntezerApi
     from assemblyline.common import log
     from logging import getLogger, DEBUG
     log.init_logging("assemblyline", log_level=DEBUG)
@@ -236,7 +236,7 @@ def dummy_al_intezer_api_instance(mocker):
     yield al_intezer_api
 
 
-class TestIntezerDynamic:
+class TestIntezer:
     @classmethod
     def setup_class(cls):
         # Placing the samples in the tmp directory
@@ -254,42 +254,41 @@ class TestIntezerDynamic:
             os.remove(temp_sample_path)
 
     @staticmethod
-    def test_init(intezer_dynamic_class_instance):
-        assert intezer_dynamic_class_instance.client is None
+    def test_init(intezer_class_instance):
+        assert intezer_class_instance.client is None
 
     @staticmethod
-    def test_start(intezer_dynamic_class_instance, dummy_api_interface_class, mocker):
-        from intezer_dynamic import ALIntezerApi
-        mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
-        intezer_dynamic_class_instance.start()
-        assert isinstance(intezer_dynamic_class_instance.client, ALIntezerApi)
+    def test_start(intezer_class_instance, dummy_api_interface_class, mocker):
+        from intezer import ALIntezerApi
+        mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
+        intezer_class_instance.start()
+        assert isinstance(intezer_class_instance.client, ALIntezerApi)
         assert True
 
     @staticmethod
-    def test_stop(intezer_dynamic_class_instance):
-        intezer_dynamic_class_instance.stop()
+    def test_stop(intezer_class_instance):
+        intezer_class_instance.stop()
         assert True
 
     @staticmethod
     @pytest.mark.parametrize("sample", samples)
-    def test_execute(sample, intezer_dynamic_class_instance, dummy_api_interface_class, dummy_get_response_class, mocker):
+    def test_execute(sample, intezer_class_instance, dummy_api_interface_class, mocker):
         from assemblyline_v4_service.common.task import Task
         from assemblyline.odm.messages.task import Task as ServiceTask
         from assemblyline_v4_service.common.request import ServiceRequest
-        from json import loads
-        from intezer_dynamic import ALIntezerApi
+        from intezer import ALIntezerApi
 
-        mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
-        intezer_dynamic_class_instance.start()
+        mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
+        intezer_class_instance.start()
 
         service_task = ServiceTask(sample)
         task = Task(service_task)
         task.service_config = {
             "analysis_id": "",
         }
-        intezer_dynamic_class_instance._task = task
+        intezer_class_instance._task = task
         service_request = ServiceRequest(task)
-        intezer_dynamic_class_instance.config["private_only"] = False
+        intezer_class_instance.config["private_only"] = False
 
         mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={"analysis_id": "blah"})
         mocker.patch.object(ALIntezerApi, "analyze_by_file", return_value="blah")
@@ -298,74 +297,91 @@ class TestIntezerDynamic:
         mocker.patch.object(ALIntezerApi, "get_sub_analyses_by_id", return_value=[])
 
         # Actually executing the sample
-        intezer_dynamic_class_instance.execute(service_request)
+        intezer_class_instance.execute(service_request)
 
         # Code coverage
         task.service_config = {
             "analysis_id": "blah",
         }
-        intezer_dynamic_class_instance._task = task
+        intezer_class_instance._task = task
         service_request = ServiceRequest(task)
-        intezer_dynamic_class_instance.execute(service_request)
+        intezer_class_instance.execute(service_request)
 
         task.service_config = {"analysis_id": ""}
-        intezer_dynamic_class_instance.config["is_on_premise"] = False
+        intezer_class_instance.config["is_on_premise"] = False
         mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={"verdict": "not_supported"})
         mocker.patch.object(ALIntezerApi, "get_dynamic_ttps", return_value=[])
-        intezer_dynamic_class_instance.execute(service_request)
+        intezer_class_instance.execute(service_request)
 
         mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={"verdict": "failed"})
-        intezer_dynamic_class_instance.execute(service_request)
+        intezer_class_instance.execute(service_request)
 
         mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={"verdict": "trusted"})
-        intezer_dynamic_class_instance.execute(service_request)
+        intezer_class_instance.execute(service_request)
+
+        task.service_config = {
+            "allow_dynamic_submit": False,
+            "analysis_id": ""
+        }
+        intezer_class_instance._task = task
+        service_request = ServiceRequest(task)
+        intezer_class_instance.execute(service_request)
+
+        task.service_config = {
+            "allow_dynamic_submit": True,
+            "analysis_id": ""
+        }
+        intezer_class_instance._task = task
+        service_request = ServiceRequest(task)
+        intezer_class_instance.config["dynamic_submit"] = False
+        intezer_class_instance.execute(service_request)
 
     @staticmethod
-    def test_get_analysis_metadata(intezer_dynamic_class_instance, dummy_api_interface_class, mocker):
-        from intezer_dynamic import ALIntezerApi
-        mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
-        intezer_dynamic_class_instance.start()
+    def test_get_analysis_metadata(intezer_class_instance, dummy_api_interface_class, mocker):
+        from intezer import ALIntezerApi
+        mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
+        intezer_class_instance.start()
 
         analysis_metadata = {"analysis_id": "blah", "verdict": "malicious"}
         mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value=analysis_metadata)
-        assert intezer_dynamic_class_instance._get_analysis_metadata("", "blah") == analysis_metadata
-        assert intezer_dynamic_class_instance._get_analysis_metadata(
+        assert intezer_class_instance._get_analysis_metadata("", "blah") == analysis_metadata
+        assert intezer_class_instance._get_analysis_metadata(
             "blah", "blah") == {"analysis_id": "blah", "verdict": None}
 
     @staticmethod
     def test_submit_file_for_analysis(
-            intezer_dynamic_class_instance, dummy_request_class, dummy_get_response_class, dummy_api_interface_class,
+            intezer_class_instance, dummy_request_class, dummy_get_response_class, dummy_api_interface_class,
             mocker):
         from intezer_sdk.api import IntezerApi
         from intezer_sdk.errors import ServerError
-        from intezer_dynamic import ALIntezerApi
-        mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
-        intezer_dynamic_class_instance.start()
+        from intezer import ALIntezerApi
+        mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
+        intezer_class_instance.start()
 
         mocker.patch.object(ALIntezerApi, "analyze_by_file", return_value="blah")
         mocker.patch.object(ALIntezerApi, "get_file_analysis_response",
                             return_value=dummy_get_response_class("succeeded"))
         mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={})
-        mocker.patch("intezer_dynamic.sleep")
-        assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        mocker.patch("intezer.sleep")
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
 
         mocker.patch.object(ALIntezerApi, "get_file_analysis_response", return_value=dummy_get_response_class("failed"))
-        assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
 
         mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(
             415, dummy_get_response_class("blah")))
-        assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
 
         mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(
             413, dummy_get_response_class("blah")))
-        assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
 
         mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(
             500, dummy_get_response_class("blah")))
-        assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
 
-        mocker.patch("intezer_dynamic.time", return_value=float("inf"))
-        assert intezer_dynamic_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        mocker.patch("intezer.time", return_value=float("inf"))
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
 
     @staticmethod
     @pytest.mark.parametrize("details, uninteresting_keys, expected_output",
@@ -376,55 +392,55 @@ class TestIntezerDynamic:
                              ]
                              )
     def test_process_details(details, uninteresting_keys, expected_output):
-        from intezer_dynamic import IntezerDynamic
-        assert IntezerDynamic._process_details(details, uninteresting_keys) == expected_output
+        from intezer import Intezer
+        assert Intezer._process_details(details, uninteresting_keys) == expected_output
 
     @staticmethod
-    def test_set_heuristic_by_verdict(intezer_dynamic_class_instance):
+    def test_set_heuristic_by_verdict(intezer_class_instance):
         from assemblyline_v4_service.common.result import ResultSection
         result_section = ResultSection("blah")
-        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, None)
+        intezer_class_instance._set_heuristic_by_verdict(result_section, None)
         assert result_section.heuristic is None
 
-        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "blah")
+        intezer_class_instance._set_heuristic_by_verdict(result_section, "blah")
         assert result_section.heuristic is None
 
-        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "trusted")
+        intezer_class_instance._set_heuristic_by_verdict(result_section, "trusted")
         assert result_section.heuristic is None
 
-        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "malicious")
+        intezer_class_instance._set_heuristic_by_verdict(result_section, "malicious")
         assert result_section.heuristic.heur_id == 1
 
         result_section = ResultSection("blah")
-        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "known_malicious")
+        intezer_class_instance._set_heuristic_by_verdict(result_section, "known_malicious")
         assert result_section.heuristic.heur_id == 1
 
         result_section = ResultSection("blah")
-        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "suspicious")
+        intezer_class_instance._set_heuristic_by_verdict(result_section, "suspicious")
         assert result_section.heuristic.heur_id == 2
 
         result_section = ResultSection("blah")
-        intezer_dynamic_class_instance._set_heuristic_by_verdict(result_section, "interesting")
+        intezer_class_instance._set_heuristic_by_verdict(result_section, "interesting")
         assert result_section.heuristic.heur_id == 3
 
     @staticmethod
-    def test_process_iocs(intezer_dynamic_class_instance, dummy_api_interface_class, mocker):
-        from intezer_dynamic import ALIntezerApi
+    def test_process_iocs(intezer_class_instance, dummy_api_interface_class, mocker):
+        from intezer import ALIntezerApi
         from intezer_sdk.api import IntezerApi
         from assemblyline_v4_service.common.result import ResultSection
         from requests import HTTPError
-        mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
-        intezer_dynamic_class_instance.start()
+        mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
+        intezer_class_instance.start()
         parent_res_sec = ResultSection("blah")
         file_verdict_map = {}
 
         mocker.patch.object(ALIntezerApi, "get_iocs", return_value={"files": [], "network": []})
-        intezer_dynamic_class_instance._process_iocs("blah", file_verdict_map, parent_res_sec)
+        intezer_class_instance._process_iocs("blah", file_verdict_map, parent_res_sec)
         assert parent_res_sec.subsections == []
         assert file_verdict_map == {}
 
         mocker.patch.object(IntezerApi, "get_iocs", side_effect=HTTPError("FORBIDDEN"))
-        intezer_dynamic_class_instance._process_iocs("blah", file_verdict_map, parent_res_sec)
+        intezer_class_instance._process_iocs("blah", file_verdict_map, parent_res_sec)
         assert parent_res_sec.subsections == []
         assert file_verdict_map == {}
 
@@ -433,7 +449,7 @@ class TestIntezerDynamic:
             return_value={"files": [{"sha256": "blah", "verdict": "malicious"}],
                           "network": [{"ioc": "1.1.1.1", "type": "ip"},
                                       {"ioc": "blah.com", "type": "domain"}]})
-        intezer_dynamic_class_instance._process_iocs("blah", file_verdict_map, parent_res_sec)
+        intezer_class_instance._process_iocs("blah", file_verdict_map, parent_res_sec)
         correct_res_sec = ResultSection("Network Communication Observed")
         correct_res_sec.add_tag("network.dynamic.ip", "1.1.1.1")
         correct_res_sec.add_tag("network.dynamic.domain", "blah.com")
@@ -443,32 +459,32 @@ class TestIntezerDynamic:
         assert file_verdict_map == {"blah": "malicious"}
 
     @staticmethod
-    def test_process_ttps(intezer_dynamic_class_instance, dummy_api_interface_class, mocker):
-        from intezer_dynamic import ALIntezerApi
+    def test_process_ttps(intezer_class_instance, dummy_api_interface_class, mocker):
+        from intezer import ALIntezerApi
         from intezer_sdk.api import IntezerApi
         from intezer_sdk.errors import UnsupportedOnPremiseVersion
         from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
         from requests import HTTPError
-        mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
-        intezer_dynamic_class_instance.start()
+        mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
+        intezer_class_instance.start()
         parent_res_sec = ResultSection("blah")
 
         mocker.patch.object(ALIntezerApi, "get_dynamic_ttps", return_value=[])
-        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        intezer_class_instance._process_ttps("blah", parent_res_sec)
         assert parent_res_sec.subsections == []
 
         mocker.patch.object(IntezerApi, "get_dynamic_ttps", side_effect=HTTPError("FORBIDDEN"))
-        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        intezer_class_instance._process_ttps("blah", parent_res_sec)
         assert parent_res_sec.subsections == []
 
         mocker.patch.object(IntezerApi, "get_dynamic_ttps", side_effect=UnsupportedOnPremiseVersion())
-        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        intezer_class_instance._process_ttps("blah", parent_res_sec)
         assert parent_res_sec.subsections == []
 
         mocker.patch.object(ALIntezerApi, "get_dynamic_ttps",
                             return_value=[{"name": "blah", "description": "blah", "data": [], "severity": 1}]
                             )
-        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        intezer_class_instance._process_ttps("blah", parent_res_sec)
         correct_res_sec = ResultSection("Signature: blah", "blah")
         correct_res_sec.set_heuristic(4)
         correct_res_sec.heuristic.add_signature_id("blah", 10)
@@ -477,7 +493,7 @@ class TestIntezerDynamic:
         parent_res_sec = ResultSection("blah")
         mocker.patch.object(ALIntezerApi, "get_dynamic_ttps", return_value=[
                             {"name": "InjectionInterProcess", "description": "blah", "data": [], "severity": 1}])
-        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        intezer_class_instance._process_ttps("blah", parent_res_sec)
         correct_res_sec = ResultSection("Signature: InjectionInterProcess", "blah")
         correct_res_sec.set_heuristic(7)
         correct_res_sec.heuristic.add_signature_id("InjectionInterProcess", 10)
@@ -487,7 +503,7 @@ class TestIntezerDynamic:
         parent_res_sec = ResultSection("blah")
         mocker.patch.object(ALIntezerApi, "get_dynamic_ttps", return_value=[
                             {"name": "enumerates_running_processes", "description": "blah", "data": [{"wow": "print me!"}], "severity": 1}])
-        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        intezer_class_instance._process_ttps("blah", parent_res_sec)
         correct_res_sec = ResultSection("Signature: enumerates_running_processes", "blah")
         correct_res_sec.set_heuristic(8)
         correct_res_sec.heuristic.add_signature_id("enumerates_running_processes", 10)
@@ -508,7 +524,7 @@ class TestIntezerDynamic:
                                 }
                             ]
                             )
-        intezer_dynamic_class_instance._process_ttps("blah", parent_res_sec)
+        intezer_class_instance._process_ttps("blah", parent_res_sec)
         correct_res_sec = ResultSection("Signature: blah", "blah")
         correct_res_sec.add_line("\tIP: blah 2.2.2.2 blah")
         correct_res_sec.set_heuristic(4)
@@ -520,12 +536,12 @@ class TestIntezerDynamic:
         assert check_section_equality(parent_res_sec.subsections[0].subsections[0], correct_res_sec)
 
     @staticmethod
-    def test_process_ttp_data(intezer_dynamic_class_instance):
+    def test_process_ttp_data(intezer_class_instance):
         from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
         sig_res = ResultSection("blah")
         ioc_table = ResultTableSection("blah")
 
-        intezer_dynamic_class_instance._process_ttp_data(
+        intezer_class_instance._process_ttp_data(
             [
                 {"wow": "print me!"},
                 {"a": ""},
@@ -564,19 +580,19 @@ class TestIntezerDynamic:
         assert check_section_equality(ioc_table, correct_ioc_res_sec)
 
     @staticmethod
-    def test_handle_subanalyses(intezer_dynamic_class_instance, dummy_request_class, dummy_api_interface_class, mocker):
+    def test_handle_subanalyses(intezer_class_instance, dummy_request_class, dummy_api_interface_class, mocker):
         from assemblyline_v4_service.common.result import ResultSection, ResultKeyValueSection, ResultProcessTreeSection, ProcessItem
-        mocker.patch.object(intezer_dynamic_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
-        intezer_dynamic_class_instance.start()
+        mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
+        intezer_class_instance.start()
 
-        mocker.patch.object(intezer_dynamic_class_instance.client, "get_sub_analyses_by_id", return_value=[])
+        mocker.patch.object(intezer_class_instance.client, "get_sub_analyses_by_id", return_value=[])
         parent_result_section = ResultSection("blah")
-        intezer_dynamic_class_instance._handle_subanalyses(
+        intezer_class_instance._handle_subanalyses(
             dummy_request_class(), "blah", "blah", {}, parent_result_section)
         assert parent_result_section.subsections == []
 
         mocker.patch.object(
-            intezer_dynamic_class_instance.client,
+            intezer_class_instance.client,
             "get_sub_analyses_by_id",
             return_value=[
                 {
@@ -597,7 +613,7 @@ class TestIntezerDynamic:
             ]
         )
         mocker.patch.object(
-            intezer_dynamic_class_instance.client,
+            intezer_class_instance.client,
             "get_sub_analysis_code_reuse_by_id",
             return_value={
                 "families": [{"reused_gene_count": 2}],
@@ -605,15 +621,15 @@ class TestIntezerDynamic:
             }
         )
         mocker.patch.object(
-            intezer_dynamic_class_instance.client,
+            intezer_class_instance.client,
             "get_sub_analysis_metadata_by_id",
             return_value={
                 "source": "blah",
                 "blah": "blah"
             }
         )
-        mocker.patch.object(intezer_dynamic_class_instance, "_process_families")
-        mocker.patch.object(intezer_dynamic_class_instance.client, "download_file_by_sha256", return_value=True)
+        mocker.patch.object(intezer_class_instance, "_process_families")
+        mocker.patch.object(intezer_class_instance.client, "download_file_by_sha256", return_value=True)
         correct_result_section = ResultKeyValueSection("Subanalysis report for blah2, extracted via blah blah")
         correct_result_section.update_items({"blah": "blah"})
         correct_code_reuse = ResultKeyValueSection("Code reuse detected")
@@ -624,7 +640,7 @@ class TestIntezerDynamic:
         correct_process_tree.add_tag("dynamic.processtree_id", "blah2.exe")
         correct_process_tree.add_tag("dynamic.process.file_name", "blah2.exe")
         dummy_request_class_instance = dummy_request_class()
-        intezer_dynamic_class_instance._handle_subanalyses(
+        intezer_class_instance._handle_subanalyses(
             dummy_request_class_instance, "blah", "blah", {}, parent_result_section)
         assert check_section_equality(parent_result_section.subsections[0], correct_result_section)
         assert check_section_equality(parent_result_section.subsections[1], correct_process_tree)
@@ -663,11 +679,11 @@ class TestIntezerDynamic:
                               ([{"family_id": "blah", "family_type": "packer", "family_name": "UPX"}],
                                {},
                                {}), ])
-    def test_process_families(families, file_verdict_map, correct_fvp, intezer_dynamic_class_instance):
+    def test_process_families(families, file_verdict_map, correct_fvp, intezer_class_instance):
         from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
 
         parent_section = ResultSection("blah")
-        intezer_dynamic_class_instance._process_families(families, "blah", file_verdict_map, parent_section)
+        intezer_class_instance._process_families(families, "blah", file_verdict_map, parent_section)
 
         if not families:
             assert parent_section.subsections == []
@@ -682,7 +698,7 @@ class TestIntezerDynamic:
             assert file_verdict_map == correct_fvp
 
     @staticmethod
-    def test_process_extraction_info(intezer_dynamic_class_instance):
+    def test_process_extraction_info(intezer_class_instance):
         from assemblyline_v4_service.common.dynamic_service_helper import OntologyResults
         so = OntologyResults()
 
@@ -804,7 +820,7 @@ class TestIntezerDynamic:
                 "original_file_name": None,
             },
         ]
-        intezer_dynamic_class_instance._process_extraction_info(processes, process_path_set, command_line_set, so)
+        intezer_class_instance._process_extraction_info(processes, process_path_set, command_line_set, so)
         for index, process in enumerate(so.get_processes()):
             process_as_primitives = process.as_primitives()
             process_as_primitives["objectid"].pop("guid")
@@ -1038,7 +1054,7 @@ class TestALIntezerApi:
     @staticmethod
     def test_analyze_by_file(dummy_al_intezer_api_instance, dummy_get_response_class):
         from intezer_sdk.errors import ServerError
-        from intezer_dynamic import CANNOT_EXTRACT_ARCHIVE
+        from intezer import CANNOT_EXTRACT_ARCHIVE
         sha256 = "blah"
         file_path = "/tmp/blah"
         file_name = "blah"
