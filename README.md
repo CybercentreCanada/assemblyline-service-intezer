@@ -5,7 +5,7 @@ This repository is an Assemblyline service that fetches the Intezer Analyze repo
 
 **NOTE!**: This service **requires** extensive setup prior to installation if you are deploying your own instance of IntezerAnalyze.
 
-**NOTE!!** This service deprecates the [IntezerStatic](https://github.com/CybercentreCanada/assemblyline-service-intezer-static) service and merges it with the IntezerDynamic service. The submission of a file to Intezer is now a service configuration option.
+**NOTE!!** This service deprecates the [IntezerStatic](https://github.com/CybercentreCanada/assemblyline-service-intezer-static) service and merges it with the IntezerDynamic service. The submission of a file to Intezer is now a service and submission configuration option.
 
 ## Execution
 
