@@ -1,6 +1,6 @@
 FROM cccs/assemblyline-v4-service-base:stable
 
-ENV SERVICE_PATH intezer_dynamic.IntezerDynamic
+ENV SERVICE_PATH intezer.Intezer
 
 USER root
 

@@ -174,7 +174,7 @@ class ALIntezerApi(IntezerApi):
                     )
                     return None
                 # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
-                # per https://github.com/CybercentreCanada/assemblyline-service-intezer-dynamic/issues/31
+                # per https://github.com/CybercentreCanada/assemblyline-service-intezer/issues/31
                 elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
                     self.log.debug(
                         f"Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'."
@@ -220,7 +220,7 @@ class ALIntezerApi(IntezerApi):
                     )
                     return {"files": [], "network": []}
                 # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
-                # per https://github.com/CybercentreCanada/assemblyline-service-intezer-dynamic/issues/31
+                # per https://github.com/CybercentreCanada/assemblyline-service-intezer/issues/31
                 elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
                     self.log.debug(
                         f"Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'."
@@ -266,7 +266,7 @@ class ALIntezerApi(IntezerApi):
                     )
                     return []
                 # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
-                # per https://github.com/CybercentreCanada/assemblyline-service-intezer-dynamic/issues/31
+                # per https://github.com/CybercentreCanada/assemblyline-service-intezer/issues/31
                 elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
                     self.log.debug(
                         f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'."
@@ -369,7 +369,6 @@ class ALIntezerApi(IntezerApi):
                 )
                 return {}
 
-
     # Overriding the class method to handle if the HTTPError exists
     def download_file_by_sha256(self, sha256: str, dir_path: str) -> bool:
         # We will try to connect with the REST API... NO MATTER WHAT
@@ -400,7 +399,7 @@ class ALIntezerApi(IntezerApi):
                     )
                     return False
                 # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
-                # per https://github.com/CybercentreCanada/assemblyline-service-intezer-dynamic/issues/31
+                # per https://github.com/CybercentreCanada/assemblyline-service-intezer/issues/31
                 elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
                     self.log.debug(
                         f"Unable to download file for SHA256 {sha256} due to '{e}'."
@@ -480,15 +479,15 @@ class ALIntezerApi(IntezerApi):
                         raise
 
 
-class IntezerDynamic(ServiceBase):
+class Intezer(ServiceBase):
     def __init__(self, config: Optional[Dict] = None) -> None:
         super().__init__(config)
-        self.log.debug("Initializing the IntezerDynamic service...")
+        self.log.debug("Initializing the Intezer service...")
         self.client: Optional[ALIntezerApi] = None
 
     def start(self) -> None:
         global global_safelist
-        self.log.debug("IntezerDynamic service started...")
+        self.log.debug("Intezer service started...")
 
         if self.config.get("base_url") != BASE_URL and not self.config["is_on_premise"]:
             self.log.warning(
@@ -508,7 +507,7 @@ class IntezerDynamic(ServiceBase):
             self.log.warning(f"Couldn't retrieve safelist from service: {e}. Continuing without it..")
 
     def stop(self) -> None:
-        self.log.debug("IntezerDynamic service ended...")
+        self.log.debug("Intezer service ended...")
 
     def execute(self, request: ServiceRequest) -> None:
         sha256 = request.sha256
@@ -518,14 +517,20 @@ class IntezerDynamic(ServiceBase):
         main_api_result_from_retrieval = self._get_analysis_metadata(request.get_param('analysis_id'), sha256)
 
         if not main_api_result_from_retrieval:
-            self.log.debug(f"SHA256 {sha256} is not on the system.")
-            main_api_result_from_submission = self._submit_file_for_analysis(request, sha256)
-            if not main_api_result_from_submission:
+            self.log.debug(f"{sha256} is not on the system.")
+            if self.config.get("allow_dynamic_submit", True) and request.get_param("dynamic_submit"):
+                main_api_result_from_submission = self._submit_file_for_analysis(request, sha256)
+                if not main_api_result_from_submission:
+                    request.result = result
+                    return
+                else:
+                    main_api_result = main_api_result_from_submission
+            else:
+                self.log.debug(f"The user has requested that {sha256} not be sent to the system for analysis. Exiting...")
                 request.result = result
                 return
-            else:
-                main_api_result = main_api_result_from_submission
         else:
+            self.log.debug(f"{sha256} ws found on the system.")
             main_api_result = main_api_result_from_retrieval
 
         verdict = main_api_result.get("verdict")
@@ -545,7 +550,7 @@ class IntezerDynamic(ServiceBase):
         analysis_id = main_api_result["analysis_id"]
 
         # Setup the main result section
-        main_kv_section = ResultKeyValueSection("IntezerDynamic analysis report")
+        main_kv_section = ResultKeyValueSection("Intezer analysis report")
         processed_main_api_result = self._process_details(
             main_api_result.copy(), UNINTERESTING_ANALYSIS_KEYS
         )
@@ -596,6 +601,7 @@ class IntezerDynamic(ServiceBase):
         :param sha256: The hash of the given file
         :return: None
         """
+        self.log.debug(f"Submitting {sha256} for analysis...")
         start_time = time()
 
         # Send the file
@@ -614,6 +620,7 @@ class IntezerDynamic(ServiceBase):
             sleep(polling_period)
             resp = self.client.get_file_analysis_response(analysis_id, ignore_not_found=False)
             status = resp.json()["status"]
+            self.log.debug(f"{sha256} is being analyzed. Current status: {status}")
             elapsed_time = time() - start_time
 
         if elapsed_time > analysis_timeout:
