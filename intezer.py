@@ -478,6 +478,27 @@ class ALIntezerApi(IntezerApi):
                     else:
                         raise
 
+    # Overriding the class method to handle if the ServerError exists
+    def get_file_analysis_response(self, analysis_id: str, ignore_not_found: bool = False) -> str:
+        # We will try to connect with the REST API... NO MATTER WHAT
+        logged = False
+        while True:
+            try:
+                return IntezerApi.get_file_analysis_response(
+                    self=self, analyses_id=analysis_id, ignore_not_found=ignore_not_found)
+            except (ConnectionError, HTTPError) as e:
+                if not logged:
+                    self.log.error(
+                        "The intezer web service is most likely down. "
+                        f"Indicator: Unable to get analysis response for analysis ID {analysis_id} due to '{e}'."
+                    )
+                    logged = True
+                if self.retry_forever:
+                    sleep(5)
+                    continue
+                else:
+                    raise
+
 
 class Intezer(ServiceBase):
     def __init__(self, config: Optional[Dict] = None) -> None:
@@ -530,7 +551,7 @@ class Intezer(ServiceBase):
                 request.result = result
                 return
         else:
-            self.log.debug(f"{sha256} ws found on the system.")
+            self.log.debug(f"{sha256} was found on the system.")
             main_api_result = main_api_result_from_retrieval
 
         verdict = main_api_result.get("verdict")

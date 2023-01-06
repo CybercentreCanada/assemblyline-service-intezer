@@ -1099,3 +1099,28 @@ class TestALIntezerApi:
             # Case 7: "Good" ServerError
             m.post(f"{dummy_al_intezer_api_instance.full_url}/analyze", exc=ServerError(413, dummy_get_response_class("blah")))
             assert dummy_al_intezer_api_instance.analyze_by_file(sha256, file_path, file_name, verify_file_support) == "file_type_not_supported"
+
+    @staticmethod
+    def test_get_file_analysis_response(dummy_al_intezer_api_instance, dummy_get_response_class):
+        analysis_id = "blah"
+        correct_rest_response = {"status": "blah"}
+        with requests_mock.Mocker() as m:
+            # Case 1: Successful call, status code 200, valid response
+            m.get(f"{dummy_al_intezer_api_instance.full_url}/analyses/{analysis_id}", json=correct_rest_response, status_code=200)
+            assert dummy_al_intezer_api_instance.get_file_analysis_response(analysis_id).json()["status"] == "blah"
+
+            # Case 2: ConnectionError
+            m.get(f"{dummy_al_intezer_api_instance.full_url}/analyses/{analysis_id}", exc=ConnectionError("blah"))
+            p1 = Process(target=dummy_al_intezer_api_instance.get_file_analysis_response, args=(analysis_id,), name="get_file_analysis_response with ConnectionError")
+            p1.start()
+            p1.join(timeout=2)
+            p1.terminate()
+            assert p1.exitcode is None
+
+            # Case 3: HTTPError
+            m.get(f"{dummy_al_intezer_api_instance.full_url}/analyses/{analysis_id}", exc=HTTPError("blah"))
+            p1 = Process(target=dummy_al_intezer_api_instance.get_file_analysis_response, args=(analysis_id,), name="get_file_analysis_response with HTTPError")
+            p1.start()
+            p1.join(timeout=2)
+            p1.terminate()
+            assert p1.exitcode is None
