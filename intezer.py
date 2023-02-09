@@ -592,7 +592,11 @@ class Intezer(ServiceBase):
             self._process_ttps(analysis_id, main_kv_section)
         self._handle_subanalyses(request, sha256, analysis_id, file_verdict_map, main_kv_section)
 
-        # Setting heuristic here to avoid FPs. An analysis should not require sub_analyses to get a heuristic assigned.
+        # Setting heuristic here to avoid FPs. An analysis should not require sub_analyses to get a heuristic
+        # assigned. A caveat to this is that the parent analysis has an unknown verdict but the sub-analysis of the
+        # same file hash yields a different verdict.
+        if verdict == "unknown" and file_verdict_map.get(sha256, "unknown") != "unknown":
+            verdict = file_verdict_map[sha256]
         self._set_heuristic_by_verdict(main_kv_section, verdict)
 
         if main_kv_section.subsections or main_kv_section.heuristic:
