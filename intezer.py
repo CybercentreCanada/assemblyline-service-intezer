@@ -673,6 +673,13 @@ class Intezer(ServiceBase):
         for key in list(details.keys()):
             if key in uninteresting_keys:
                 details.pop(key, None)
+
+            # Subanalysis indicators as of v22.1 are now a list of dictionaries containing "classification" and "name" keys
+            # We only want the value of the "name" key
+            elif key == "indicators" and isinstance(details[key], list) and all(isinstance(item, dict) for item in details[key]):
+                for index, item in enumerate(details[key]):
+                    details[key][index] = item["name"]
+
         return details
 
     def _set_heuristic_by_verdict(
