@@ -28,6 +28,7 @@ config:
   polling_period_in_seconds: 5
   analysis_timeout_in_seconds: 60
   try_to_download_every_file: false
+  download_subfiles: true
 
 submission_params:
   - default: true

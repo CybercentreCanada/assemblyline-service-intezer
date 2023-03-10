@@ -930,24 +930,25 @@ class Intezer(ServiceBase):
                     sub_kv_section, file_verdict_map.get(sub_sha256)
                 )
 
-                if can_we_download_files or self.config.get("try_to_download_every_file", False):
-                    file_was_downloaded = self.client.download_file_by_sha256(
-                        sub_sha256, self.working_directory
-                    )
-                    if file_was_downloaded:
-                        path = f"{self.working_directory}/{sub_sha256}.sample"
-                        try:
-                            request.add_extracted(
-                                path,
-                                f"{sub_sha256}.sample",
-                                f"Extracted via {extraction_method}",
-                            )
-                            self.log.debug(f"Added {sub_sha256}.sample as an extracted file.")
-                        except MaxExtractedExceeded as e:
-                            self.log.debug(f"Skipped adding {sub_sha256}.sample as an extracted file due to {e}.")
+                if self.config.get("download_subfiles", True):
+                    if can_we_download_files or self.config.get("try_to_download_every_file", False):
+                        file_was_downloaded = self.client.download_file_by_sha256(
+                            sub_sha256, self.working_directory
+                        )
+                        if file_was_downloaded:
+                            path = f"{self.working_directory}/{sub_sha256}.sample"
+                            try:
+                                request.add_extracted(
+                                    path,
+                                    f"{sub_sha256}.sample",
+                                    f"Extracted via {extraction_method}",
+                                )
+                                self.log.debug(f"Added {sub_sha256}.sample as an extracted file.")
+                            except MaxExtractedExceeded as e:
+                                self.log.debug(f"Skipped adding {sub_sha256}.sample as an extracted file due to {e}.")
+                                can_we_download_files = False
+                        else:
                             can_we_download_files = False
-                    else:
-                        can_we_download_files = False
 
         process_tree_section = so.get_process_tree_result_section()
         for process_path in process_path_set:
