@@ -1,31 +1,32 @@
 from enum import Enum
 from http import HTTPStatus
-from requests import ConnectionError, HTTPError
 from time import sleep, time
 from typing import Any, Dict, List, Optional, Set
 
-from intezer_sdk.api import IntezerApi
-from intezer_sdk.errors import UnsupportedOnPremiseVersion, ServerError
-from intezer_sdk.consts import OnPremiseVersion, BASE_URL, API_VERSION, AnalysisStatusCode
-from safe_families import SAFE_FAMILIES
-from signatures import get_attack_ids_for_signature_name, get_heur_id_for_signature_name, GENERIC_HEURISTIC_ID
-
 from assemblyline.common.str_utils import truncate
-from assemblyline.odm.models.ontology.results.process import Process as ProcessModel
+from assemblyline.odm.models.ontology.results.process import \
+    Process as ProcessModel
 from assemblyline_v4_service.common.api import ServiceAPIError
 from assemblyline_v4_service.common.base import ServiceBase
-from assemblyline_v4_service.common.dynamic_service_helper import extract_iocs_from_text_blob, MIN_TIME, OntologyResults, Process
+from assemblyline_v4_service.common.dynamic_service_helper import (
+    MIN_TIME, OntologyResults, Process, extract_iocs_from_text_blob)
 from assemblyline_v4_service.common.request import ServiceRequest
-from assemblyline_v4_service.common.result import (
-    Result,
-    ResultKeyValueSection,
-    ResultSection,
-    ResultTableSection,
-    ResultTextSection,
-    TableRow,
-)
+from assemblyline_v4_service.common.result import (Result,
+                                                   ResultKeyValueSection,
+                                                   ResultSection,
+                                                   ResultTableSection,
+                                                   ResultTextSection, TableRow)
 from assemblyline_v4_service.common.tag_helper import add_tag
 from assemblyline_v4_service.common.task import MaxExtractedExceeded
+from intezer_sdk.api import IntezerApi
+from intezer_sdk.consts import (API_VERSION, BASE_URL, AnalysisStatusCode,
+                                OnPremiseVersion)
+from intezer_sdk.errors import ServerError, UnsupportedOnPremiseVersion
+from requests import ConnectionError, HTTPError
+from safe_families import SAFE_FAMILIES
+from signatures import (GENERIC_HEURISTIC_ID,
+                        get_attack_ids_for_signature_name,
+                        get_heur_id_for_signature_name)
 
 global_safelist: Optional[Dict[str, Dict[str, List[str]]]] = None
 
@@ -92,14 +93,14 @@ class Verdicts(Enum):
     ADMINISTRATION_TOOL = "administration_tool"
     KNOWN_ADMINISTRATION_TOOL = "known_administration_tool"
     PACKED = "packed"
-    PROBABLY_PACKED = "probably_packed"
     SCRIPT = "script"
     SUSPICIOUS = "suspicious"
-    SUSPICIOUS_VERDICTS = [ADMINISTRATION_TOOL, KNOWN_ADMINISTRATION_TOOL, PACKED, PROBABLY_PACKED, SCRIPT, SUSPICIOUS]
+    SUSPICIOUS_VERDICTS = [ADMINISTRATION_TOOL, KNOWN_ADMINISTRATION_TOOL, PACKED, SCRIPT, SUSPICIOUS]
 
     # Of Interest
     FAMILY_TYPE_OF_INTEREST = "interesting"
-    FAMILY_TYPE_OF_INTEREST_VERDICTS = [FAMILY_TYPE_OF_INTEREST]
+    PROBABLY_PACKED = "probably_packed"
+    FAMILY_TYPE_OF_INTEREST_VERDICTS = [FAMILY_TYPE_OF_INTEREST, PROBABLY_PACKED]
 
     # Unknown
     UNIQUE = "unique"
