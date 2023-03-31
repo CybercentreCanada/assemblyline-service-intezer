@@ -1,9 +1,10 @@
-from multiprocessing import Process
 import os
-import pytest
-from requests import ConnectionError, HTTPError
-import requests_mock
 import shutil
+from multiprocessing import Process
+
+import pytest
+import requests_mock
+from requests import ConnectionError, HTTPError
 
 # Getting absolute paths, names and regexes
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -219,9 +220,10 @@ def dummy_request_class():
 
 @pytest.fixture
 def dummy_al_intezer_api_instance(mocker):
-    from intezer import ALIntezerApi
+    from logging import DEBUG, getLogger
+
     from assemblyline.common import log
-    from logging import getLogger, DEBUG
+    from intezer import ALIntezerApi
     log.init_logging("assemblyline", log_level=DEBUG)
 
     al_intezer_api = ALIntezerApi(
@@ -273,9 +275,9 @@ class TestIntezer:
     @staticmethod
     @pytest.mark.parametrize("sample", samples)
     def test_execute(sample, intezer_class_instance, dummy_api_interface_class, mocker):
-        from assemblyline_v4_service.common.task import Task
         from assemblyline.odm.messages.task import Task as ServiceTask
         from assemblyline_v4_service.common.request import ServiceRequest
+        from assemblyline_v4_service.common.task import Task
         from intezer import ALIntezerApi
 
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
@@ -352,9 +354,9 @@ class TestIntezer:
     def test_submit_file_for_analysis(
             intezer_class_instance, dummy_request_class, dummy_get_response_class, dummy_api_interface_class,
             mocker):
+        from intezer import ALIntezerApi
         from intezer_sdk.api import IntezerApi
         from intezer_sdk.errors import ServerError
-        from intezer import ALIntezerApi
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
 
@@ -389,6 +391,7 @@ class TestIntezer:
                                  ({}, [], {}),
                                  ({"a": "b"}, [], {"a": "b"}),
                                  ({"a": "b"}, ["a"], {}),
+                                 ({"reused_gene_count": "b"}, ["a"], {"reused_code_count": "b"}),
                              ]
                              )
     def test_process_details(details, uninteresting_keys, expected_output):
@@ -425,9 +428,9 @@ class TestIntezer:
 
     @staticmethod
     def test_process_iocs(intezer_class_instance, dummy_api_interface_class, mocker):
+        from assemblyline_v4_service.common.result import ResultSection
         from intezer import ALIntezerApi
         from intezer_sdk.api import IntezerApi
-        from assemblyline_v4_service.common.result import ResultSection
         from requests import HTTPError
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
@@ -460,10 +463,12 @@ class TestIntezer:
 
     @staticmethod
     def test_process_ttps(intezer_class_instance, dummy_api_interface_class, mocker):
+        from assemblyline_v4_service.common.result import (ResultSection,
+                                                           ResultTableSection,
+                                                           TableRow)
         from intezer import ALIntezerApi
         from intezer_sdk.api import IntezerApi
         from intezer_sdk.errors import UnsupportedOnPremiseVersion
-        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
         from requests import HTTPError
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
@@ -537,7 +542,9 @@ class TestIntezer:
 
     @staticmethod
     def test_process_ttp_data(intezer_class_instance):
-        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
+        from assemblyline_v4_service.common.result import (ResultSection,
+                                                           ResultTableSection,
+                                                           TableRow)
         sig_res = ResultSection("blah")
         ioc_table = ResultTableSection("blah")
 
@@ -581,7 +588,9 @@ class TestIntezer:
 
     @staticmethod
     def test_handle_subanalyses(intezer_class_instance, dummy_request_class, dummy_api_interface_class, mocker):
-        from assemblyline_v4_service.common.result import ResultSection, ResultKeyValueSection, ResultProcessTreeSection, ProcessItem
+        from assemblyline_v4_service.common.result import (
+            ProcessItem, ResultKeyValueSection, ResultProcessTreeSection,
+            ResultSection)
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
 
@@ -680,7 +689,9 @@ class TestIntezer:
                                {},
                                {}), ])
     def test_process_families(families, file_verdict_map, correct_fvp, intezer_class_instance):
-        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
+        from assemblyline_v4_service.common.result import (ResultSection,
+                                                           ResultTableSection,
+                                                           TableRow)
 
         parent_section = ResultSection("blah")
         intezer_class_instance._process_families(families, "blah", file_verdict_map, parent_section)
@@ -699,7 +710,8 @@ class TestIntezer:
 
     @staticmethod
     def test_process_extraction_info(intezer_class_instance):
-        from assemblyline_v4_service.common.dynamic_service_helper import OntologyResults
+        from assemblyline_v4_service.common.dynamic_service_helper import \
+            OntologyResults
         so = OntologyResults()
 
         processes = [
@@ -1053,8 +1065,8 @@ class TestALIntezerApi:
 
     @staticmethod
     def test_analyze_by_file(dummy_al_intezer_api_instance, dummy_get_response_class):
-        from intezer_sdk.errors import ServerError
         from intezer import CANNOT_EXTRACT_ARCHIVE
+        from intezer_sdk.errors import ServerError
         sha256 = "blah"
         file_path = "/tmp/blah"
         file_name = "blah"
