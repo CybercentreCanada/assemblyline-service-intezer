@@ -681,6 +681,10 @@ class Intezer(ServiceBase):
                 for index, item in enumerate(details[key]):
                     details[key][index] = item["name"]
 
+            # Rename reused_gene_count key to reused_code_count
+            elif key == "reused_gene_count":
+                details["reused_code_count"] = details.pop(key)
+
         return details
 
     def _set_heuristic_by_verdict(
