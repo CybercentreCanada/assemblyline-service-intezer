@@ -1,6 +1,4 @@
 pytest
 pytest-mock
-pytest-cov
-codecov
 intezer-sdk
 requests-mock
