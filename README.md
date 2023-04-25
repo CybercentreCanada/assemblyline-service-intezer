@@ -32,6 +32,7 @@ If you are using Intezer's Dynamic Execution module, then set the service timeou
 * **analysis_timeout_in_seconds**: This integer is the time to wait for an analysis to complete.
 * **try_to_download_every_file**: This is a flag used for indicating if we want to attempt to download every available file, despite receiving an error on a previous attempt.
 * **download_subfiles**: This is a flag used for indicating if we want to download sub files. Users may want to set this to `false` because extracted [files that are downloaded count against your quota](https://support.intezer.com/hc/en-us/articles/360021366619-How-is-Your-Analysis-Quota-Calculated-).
+* **min_malware_genes**: This is the minimum number of "malware" genes found in the "Family Details" for us to set the verdict of the analysis to malicious.
 
 ### Submission Parameters
 * **analysis_id**: This is the analysis ID of an analysis that is already on the system. The cloud API counts retrieving the analysis by file hash as a "File Scan" which counts towards an account's monthly quota. We can circumvent this by submitting the analysis ID of an analysis. That being said, this will ignore the file that you submit to Assemblyline.
