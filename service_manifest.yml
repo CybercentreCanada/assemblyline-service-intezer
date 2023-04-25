@@ -29,6 +29,7 @@ config:
   analysis_timeout_in_seconds: 60
   try_to_download_every_file: false
   download_subfiles: true
+  min_malware_genes: 5
 
 submission_params:
   - default: true
@@ -97,6 +98,11 @@ heuristics:
     score: 0
     filetype: .*
     description: Intezer raised a signature
+  - heur_id: 12
+    name: Reused Malware Genes
+    score: 0
+    filetype: .*
+    description: Intezer has detected reused malware genes
 
 docker_config:
   allow_internet_access: true

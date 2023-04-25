@@ -4,29 +4,22 @@ from time import sleep, time
 from typing import Any, Dict, List, Optional, Set
 
 from assemblyline.common.str_utils import truncate
-from assemblyline.odm.models.ontology.results.process import \
-    Process as ProcessModel
+from assemblyline.odm.models.ontology.results.process import Process as ProcessModel
 from assemblyline_v4_service.common.api import ServiceAPIError
 from assemblyline_v4_service.common.base import ServiceBase
-from assemblyline_v4_service.common.dynamic_service_helper import (
-    MIN_TIME, OntologyResults, Process, extract_iocs_from_text_blob)
+from assemblyline_v4_service.common.dynamic_service_helper import (MIN_TIME, OntologyResults, Process,
+                                                                   extract_iocs_from_text_blob)
 from assemblyline_v4_service.common.request import ServiceRequest
-from assemblyline_v4_service.common.result import (Result,
-                                                   ResultKeyValueSection,
-                                                   ResultSection,
-                                                   ResultTableSection,
+from assemblyline_v4_service.common.result import (Result, ResultKeyValueSection, ResultSection, ResultTableSection,
                                                    ResultTextSection, TableRow)
 from assemblyline_v4_service.common.tag_helper import add_tag
 from assemblyline_v4_service.common.task import MaxExtractedExceeded
 from intezer_sdk.api import IntezerApi
-from intezer_sdk.consts import (API_VERSION, BASE_URL, AnalysisStatusCode,
-                                OnPremiseVersion)
+from intezer_sdk.consts import API_VERSION, BASE_URL, AnalysisStatusCode, OnPremiseVersion
 from intezer_sdk.errors import ServerError, UnsupportedOnPremiseVersion
 from requests import ConnectionError, HTTPError
 from safe_families import SAFE_FAMILIES
-from signatures import (GENERIC_HEURISTIC_ID,
-                        get_attack_ids_for_signature_name,
-                        get_heur_id_for_signature_name)
+from signatures import GENERIC_HEURISTIC_ID, get_attack_ids_for_signature_name, get_heur_id_for_signature_name
 
 global_safelist: Optional[Dict[str, Dict[str, List[str]]]] = None
 
@@ -66,12 +59,14 @@ URL_KEYS = ["http_request", "url", "suspicious_request", "network_http", "reques
 IP_KEYS = ["IP"]
 DOMAIN_KEYS = ["domain"]
 
-DEFAULT_ANALYSIS_TIMEOUT = 180
-DEFAULT_POLLING_PERIOD = 5
-
 COMPLETED_STATUSES = [AnalysisStatusCode.FINISH.value, AnalysisStatusCode.FAILED.value, "succeeded"]
 
 CANNOT_EXTRACT_ARCHIVE = "Cannot extract archive"
+
+# Defaults
+DEFAULT_ANALYSIS_TIMEOUT = 180
+DEFAULT_POLLING_PERIOD = 5
+DEFAULT_MIN_MALWARE_GENES = 5
 
 
 # From the user-guide
@@ -458,7 +453,8 @@ class ALIntezerApi(IntezerApi):
                     )
                     return AnalysisStatusCode.FAILED.value
                 elif CANNOT_EXTRACT_ARCHIVE in repr(e):
-                    self.log.warning(f"Unable to extract archive for SHA256 {sha256}, possibly because it is password-protected.")
+                    self.log.warning(
+                        f"Unable to extract archive for SHA256 {sha256}, possibly because it is password-protected.")
                     return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
                 # If you submit a file that is too big for Intezer, you will get a 413 REQUEST_ENTITY_TOO_LARGE on this endpoint.
                 elif str(HTTPStatus.REQUEST_ENTITY_TOO_LARGE.value) in repr(e) or HTTPStatus.REQUEST_ENTITY_TOO_LARGE.name in repr(e):
@@ -548,7 +544,8 @@ class Intezer(ServiceBase):
                 else:
                     main_api_result = main_api_result_from_submission
             else:
-                self.log.debug(f"The user has requested that {sha256} not be sent to the system for analysis. Exiting...")
+                self.log.debug(
+                    f"The user has requested that {sha256} not be sent to the system for analysis. Exiting...")
                 request.result = result
                 return
         else:
@@ -989,9 +986,25 @@ class Intezer(ServiceBase):
             #     family_section.add_tag("attribution.family", family["family_name"])
 
             # Overwrite value if not malicious
-            if family_type in MALICIOUS_FAMILY_TYPES and (
-                    sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] != Verdicts.MALICIOUS.value):
-                file_verdict_map[sub_sha256] = Verdicts.MALICIOUS.value
+            if family_type in MALICIOUS_FAMILY_TYPES:
+                reused_gene_count = family["reused_gene_count"]
+                if sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] != Verdicts.MALICIOUS.value:
+                    # We want to avoid false positives by ensuring that we have a reasonable amount of malware genes
+                    if reused_gene_count >= self.config.get("min_malware_genes", DEFAULT_MIN_MALWARE_GENES):
+                        file_verdict_map[sub_sha256] = Verdicts.MALICIOUS.value
+
+                # We also want to track the number of reused malware genes via heuristic 12
+                family_section.set_heuristic(12)
+                if reused_gene_count < 5:
+                    family_section.heuristic.add_signature_id("less_than_5")
+                elif reused_gene_count >= 5 and reused_gene_count < 10:
+                    family_section.heuristic.add_signature_id("between_5_and_10")
+                elif reused_gene_count >= 10 and reused_gene_count < 25:
+                    family_section.heuristic.add_signature_id("between_10_and_25")
+                elif reused_gene_count >= 25 and reused_gene_count < 50:
+                    family_section.heuristic.add_signature_id("between_25_and_50")
+                elif reused_gene_count >= 50:
+                    family_section.heuristic.add_signature_id("50_or_more")
 
             # Only overwrite value if value is not already malicious
             elif family_type in FAMILY_TYPES_OF_INTEREST and family_name not in SAFE_FAMILIES[family_type] and (sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] not in Verdicts.MALICIOUS_VERDICTS.value):
