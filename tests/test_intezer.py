@@ -463,9 +463,7 @@ class TestIntezer:
 
     @staticmethod
     def test_process_ttps(intezer_class_instance, dummy_api_interface_class, mocker):
-        from assemblyline_v4_service.common.result import (ResultSection,
-                                                           ResultTableSection,
-                                                           TableRow)
+        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
         from intezer import ALIntezerApi
         from intezer_sdk.api import IntezerApi
         from intezer_sdk.errors import UnsupportedOnPremiseVersion
@@ -542,9 +540,7 @@ class TestIntezer:
 
     @staticmethod
     def test_process_ttp_data(intezer_class_instance):
-        from assemblyline_v4_service.common.result import (ResultSection,
-                                                           ResultTableSection,
-                                                           TableRow)
+        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
         sig_res = ResultSection("blah")
         ioc_table = ResultTableSection("blah")
 
@@ -588,9 +584,8 @@ class TestIntezer:
 
     @staticmethod
     def test_handle_subanalyses(intezer_class_instance, dummy_request_class, dummy_api_interface_class, mocker):
-        from assemblyline_v4_service.common.result import (
-            ProcessItem, ResultKeyValueSection, ResultProcessTreeSection,
-            ResultSection)
+        from assemblyline_v4_service.common.result import (ProcessItem, ResultKeyValueSection, ResultProcessTreeSection,
+                                                           ResultSection)
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
 
@@ -661,37 +656,35 @@ class TestIntezer:
                              [([],
                                {},
                                {}),
-                              ([{"blah": "blah", "family_type": "blah", "family_name": "blah"}],
+                              ([{"blah": "blah", "family_type": "blah", "family_name": "blah", "reused_gene_count": 4}],
                                {},
                                {}),
-                              ([{"family_id": "blah", "family_type": "blah", "family_name": "blah"}],
+                              ([{"family_id": "blah", "family_type": "blah", "family_name": "blah", "reused_gene_count": 4}],
                                {},
                                {}),
-                              ([{"family_id": "blah", "family_type": "application", "family_name": "blah"}],
+                              ([{"family_id": "blah", "family_type": "application", "family_name": "blah", "reused_gene_count": 6}],
                                {},
                                {}),
-                              ([{"family_id": "blah", "family_type": "malware", "family_name": "blah"}],
+                              ([{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6}],
                                {},
                                {"blah": "malicious"}),
-                              ([{"family_id": "blah", "family_type": "malware", "family_name": "blah"}],
+                              ([{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6}],
                                {"blah": "blah"},
                                {"blah": "malicious"}),
-                              ([{"family_id": "blah", "family_type": "malware", "family_name": "blah"}],
+                              ([{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 66}],
                                {"blah": "malicious"},
                                {"blah": "malicious"}),
-                              ([{"family_id": "blah", "family_type": "packer", "family_name": "blah"}],
+                              ([{"family_id": "blah", "family_type": "packer", "family_name": "blah", "reused_gene_count": 6}],
                                {},
                                {"blah": "interesting"}),
-                              ([{"family_id": "blah", "family_type": "packer", "family_name": "blah"}],
+                              ([{"family_id": "blah", "family_type": "packer", "family_name": "blah", "reused_gene_count": 6}],
                                {"blah": "malicious"},
                                {"blah": "malicious"}),
-                              ([{"family_id": "blah", "family_type": "packer", "family_name": "UPX"}],
+                              ([{"family_id": "blah", "family_type": "packer", "family_name": "UPX", "reused_gene_count": 6}],
                                {},
                                {}), ])
     def test_process_families(families, file_verdict_map, correct_fvp, intezer_class_instance):
-        from assemblyline_v4_service.common.result import (ResultSection,
-                                                           ResultTableSection,
-                                                           TableRow)
+        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
 
         parent_section = ResultSection("blah")
         intezer_class_instance._process_families(families, "blah", file_verdict_map, parent_section)
@@ -703,15 +696,21 @@ class TestIntezer:
             for family in families:
                 if "family_id" in family:
                     family.pop("family_id")
+                family["reused_code_count"] = family.pop("reused_gene_count")
                 correct_result_section.add_row(TableRow(**family))
 
+                if family["family_type"] == "malware":
+                    correct_result_section.set_heuristic(12)
+                    if family["reused_code_count"] == 6:
+                        correct_result_section.heuristic.add_signature_id("between_5_and_10")
+                    elif family["reused_code_count"] == 66:
+                        correct_result_section.heuristic.add_signature_id("50_or_more")
             assert check_section_equality(parent_section.subsections[0], correct_result_section)
             assert file_verdict_map == correct_fvp
 
     @staticmethod
     def test_process_extraction_info(intezer_class_instance):
-        from assemblyline_v4_service.common.dynamic_service_helper import \
-            OntologyResults
+        from assemblyline_v4_service.common.dynamic_service_helper import OntologyResults
         so = OntologyResults()
 
         processes = [
