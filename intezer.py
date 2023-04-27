@@ -994,7 +994,8 @@ class Intezer(ServiceBase):
                         file_verdict_map[sub_sha256] = Verdicts.MALICIOUS.value
 
                 # We also want to track the number of reused malware genes via heuristic 12
-                family_section.set_heuristic(12)
+                if family_section.heuristic is None:
+                    family_section.set_heuristic(12)
                 if reused_gene_count < 5:
                     family_section.heuristic.add_signature_id("less_than_5")
                 elif reused_gene_count >= 5 and reused_gene_count < 10:
