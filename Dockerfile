@@ -8,7 +8,9 @@ RUN apt-get update
 
 USER assemblyline
 
-RUN pip install intezer-sdk && rm -rf ~/.cache/pip
+# Install python dependencies
+COPY requirements.txt requirements.txt
+RUN pip install --no-cache-dir --user --requirement requirements.txt && rm -rf ~/.cache/pip
 
 WORKDIR /opt/al_service
 COPY . .

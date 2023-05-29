@@ -1,9 +1,26 @@
 import os
 import shutil
+from logging import DEBUG, getLogger
 from multiprocessing import Process
 
 import pytest
 import requests_mock
+from assemblyline.common import log
+from assemblyline.odm.messages.task import Task as ServiceTask
+from assemblyline_service_utilities.common.dynamic_service_helper import OntologyResults
+from assemblyline_v4_service.common.request import ServiceRequest
+from assemblyline_v4_service.common.result import (
+    ProcessItem,
+    ResultKeyValueSection,
+    ResultProcessTreeSection,
+    ResultSection,
+    ResultTableSection,
+    TableRow,
+)
+from assemblyline_v4_service.common.task import Task
+from intezer import CANNOT_EXTRACT_ARCHIVE, ALIntezerApi, Intezer
+from intezer_sdk.api import IntezerApi
+from intezer_sdk.errors import ServerError, UnsupportedOnPremiseVersion
 from requests import ConnectionError, HTTPError
 
 # Getting absolute paths, names and regexes
@@ -169,7 +186,6 @@ def remove_tmp_manifest():
 def intezer_class_instance():
     create_tmp_manifest()
     try:
-        from intezer import Intezer
         yield Intezer()
     finally:
         remove_tmp_manifest()
@@ -220,10 +236,6 @@ def dummy_request_class():
 
 @pytest.fixture
 def dummy_al_intezer_api_instance(mocker):
-    from logging import DEBUG, getLogger
-
-    from assemblyline.common import log
-    from intezer import ALIntezerApi
     log.init_logging("assemblyline", log_level=DEBUG)
 
     al_intezer_api = ALIntezerApi(
@@ -261,7 +273,6 @@ class TestIntezer:
 
     @staticmethod
     def test_start(intezer_class_instance, dummy_api_interface_class, mocker):
-        from intezer import ALIntezerApi
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
         assert isinstance(intezer_class_instance.client, ALIntezerApi)
@@ -275,11 +286,6 @@ class TestIntezer:
     @staticmethod
     @pytest.mark.parametrize("sample", samples)
     def test_execute(sample, intezer_class_instance, dummy_api_interface_class, mocker):
-        from assemblyline.odm.messages.task import Task as ServiceTask
-        from assemblyline_v4_service.common.request import ServiceRequest
-        from assemblyline_v4_service.common.task import Task
-        from intezer import ALIntezerApi
-
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
 
@@ -340,7 +346,6 @@ class TestIntezer:
 
     @staticmethod
     def test_get_analysis_metadata(intezer_class_instance, dummy_api_interface_class, mocker):
-        from intezer import ALIntezerApi
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
 
@@ -354,9 +359,6 @@ class TestIntezer:
     def test_submit_file_for_analysis(
             intezer_class_instance, dummy_request_class, dummy_get_response_class, dummy_api_interface_class,
             mocker):
-        from intezer import ALIntezerApi
-        from intezer_sdk.api import IntezerApi
-        from intezer_sdk.errors import ServerError
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
 
@@ -395,12 +397,10 @@ class TestIntezer:
                              ]
                              )
     def test_process_details(details, uninteresting_keys, expected_output):
-        from intezer import Intezer
         assert Intezer._process_details(details, uninteresting_keys) == expected_output
 
     @staticmethod
     def test_set_heuristic_by_verdict(intezer_class_instance):
-        from assemblyline_v4_service.common.result import ResultSection
         result_section = ResultSection("blah")
         intezer_class_instance._set_heuristic_by_verdict(result_section, None)
         assert result_section.heuristic is None
@@ -428,10 +428,6 @@ class TestIntezer:
 
     @staticmethod
     def test_process_iocs(intezer_class_instance, dummy_api_interface_class, mocker):
-        from assemblyline_v4_service.common.result import ResultSection
-        from intezer import ALIntezerApi
-        from intezer_sdk.api import IntezerApi
-        from requests import HTTPError
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
         parent_res_sec = ResultSection("blah")
@@ -463,11 +459,6 @@ class TestIntezer:
 
     @staticmethod
     def test_process_ttps(intezer_class_instance, dummy_api_interface_class, mocker):
-        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
-        from intezer import ALIntezerApi
-        from intezer_sdk.api import IntezerApi
-        from intezer_sdk.errors import UnsupportedOnPremiseVersion
-        from requests import HTTPError
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
         parent_res_sec = ResultSection("blah")
@@ -540,7 +531,6 @@ class TestIntezer:
 
     @staticmethod
     def test_process_ttp_data(intezer_class_instance):
-        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
         sig_res = ResultSection("blah")
         ioc_table = ResultTableSection("blah")
 
@@ -584,8 +574,6 @@ class TestIntezer:
 
     @staticmethod
     def test_handle_subanalyses(intezer_class_instance, dummy_request_class, dummy_api_interface_class, mocker):
-        from assemblyline_v4_service.common.result import (ProcessItem, ResultKeyValueSection, ResultProcessTreeSection,
-                                                           ResultSection)
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
 
@@ -684,8 +672,6 @@ class TestIntezer:
                                {},
                                {}), ])
     def test_process_families(families, file_verdict_map, correct_fvp, intezer_class_instance):
-        from assemblyline_v4_service.common.result import ResultSection, ResultTableSection, TableRow
-
         parent_section = ResultSection("blah")
         intezer_class_instance._process_families(families, "blah", file_verdict_map, parent_section)
 
@@ -710,7 +696,6 @@ class TestIntezer:
 
     @staticmethod
     def test_process_extraction_info(intezer_class_instance):
-        from assemblyline_v4_service.common.dynamic_service_helper import OntologyResults
         so = OntologyResults()
 
         processes = [
@@ -922,8 +907,6 @@ class TestALIntezerApi:
 
     @staticmethod
     def test_get_dynamic_ttps(dummy_al_intezer_api_instance):
-        from intezer_sdk.errors import UnsupportedOnPremiseVersion
-
         analysis_id = "blah"
         correct_rest_response = {"result": {"details": "blah"}}
         with requests_mock.Mocker() as m:
@@ -1064,8 +1047,6 @@ class TestALIntezerApi:
 
     @staticmethod
     def test_analyze_by_file(dummy_al_intezer_api_instance, dummy_get_response_class):
-        from intezer import CANNOT_EXTRACT_ARCHIVE
-        from intezer_sdk.errors import ServerError
         sha256 = "blah"
         file_path = "/tmp/blah"
         file_name = "blah"

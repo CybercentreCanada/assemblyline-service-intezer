@@ -5,14 +5,24 @@ from typing import Any, Dict, List, Optional, Set
 
 from assemblyline.common.str_utils import truncate
 from assemblyline.odm.models.ontology.results.process import Process as ProcessModel
+from assemblyline_service_utilities.common.dynamic_service_helper import (
+    MIN_TIME,
+    OntologyResults,
+    Process,
+    extract_iocs_from_text_blob,
+)
+from assemblyline_service_utilities.common.tag_helper import add_tag
 from assemblyline_v4_service.common.api import ServiceAPIError
 from assemblyline_v4_service.common.base import ServiceBase
-from assemblyline_v4_service.common.dynamic_service_helper import (MIN_TIME, OntologyResults, Process,
-                                                                   extract_iocs_from_text_blob)
 from assemblyline_v4_service.common.request import ServiceRequest
-from assemblyline_v4_service.common.result import (Result, ResultKeyValueSection, ResultSection, ResultTableSection,
-                                                   ResultTextSection, TableRow)
-from assemblyline_v4_service.common.tag_helper import add_tag
+from assemblyline_v4_service.common.result import (
+    Result,
+    ResultKeyValueSection,
+    ResultSection,
+    ResultTableSection,
+    ResultTextSection,
+    TableRow,
+)
 from assemblyline_v4_service.common.task import MaxExtractedExceeded
 from intezer_sdk.api import IntezerApi
 from intezer_sdk.consts import API_VERSION, BASE_URL, AnalysisStatusCode, OnPremiseVersion
