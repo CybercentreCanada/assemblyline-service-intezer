@@ -985,6 +985,7 @@ class Intezer(ServiceBase):
         :return: None
         """
         family_section = ResultTableSection("Family Details")
+        family_section.set_column_order(["family_name", "family_type", "reused_code_count"])
         for family in families:
             processed_family = self._process_details(
                 family.copy(), UNINTERESTING_FAMILY_KEYS
