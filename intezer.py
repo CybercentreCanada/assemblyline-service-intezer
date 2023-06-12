@@ -72,7 +72,7 @@ DOMAIN_KEYS = ["domain"]
 COMPLETED_STATUSES = [AnalysisStatusCode.FINISH.value, AnalysisStatusCode.FAILED.value, "succeeded"]
 
 CANNOT_EXTRACT_ARCHIVE = "Cannot extract archive"
-NOT_AVAILABLE = "Not Available"
+GENERIC_MALWARE = "Generic Malware"
 
 # Defaults
 DEFAULT_ANALYSIS_TIMEOUT = 180
@@ -585,7 +585,7 @@ class Intezer(ServiceBase):
             main_api_result.copy(), UNINTERESTING_ANALYSIS_KEYS
         )
         main_kv_section.update_items(processed_main_api_result)
-        if "family_name" in main_api_result and main_api_result["family_name"] != NOT_AVAILABLE:
+        if "family_name" in main_api_result and main_api_result["family_name"] != GENERIC_MALWARE:
             # Tag both, ask forgiveness later
             main_kv_section.add_tag(
                 "attribution.implant", main_api_result["family_name"]
