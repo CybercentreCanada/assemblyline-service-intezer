@@ -576,6 +576,13 @@ class Intezer(ServiceBase):
             self.log.debug(f"The verdict was {verdict}. No need to report it.")
             request.result = result
             return
+        # If the verdict is suspicious and the sub-verdict is "probably packed", then this should be assigned as
+        # "interesting" and not "suspicious"
+        elif verdict == Verdicts.SUSPICIOUS.value and \
+            main_api_result.get("sub_verdict") == Verdicts.PROBABLY_PACKED.value:
+            self.log.debug("The verdict was 'suspicious' and the sub-verdict was 'probably packed'. "
+                           "Set verdict to 'probably packed'.")
+            verdict = main_api_result["sub_verdict"]
 
         analysis_id = main_api_result["analysis_id"]
 
