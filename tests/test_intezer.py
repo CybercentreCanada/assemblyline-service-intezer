@@ -665,13 +665,12 @@ class TestIntezer:
         correct_process_tree.add_process(ProcessItem(pid=124, name="blah2.exe", cmd=None))
         correct_process_tree.add_tag("dynamic.processtree_id", "blah2.exe")
         correct_process_tree.add_tag("dynamic.process.file_name", "blah2.exe")
-        dummy_request_class_instance_instance = dummy_request_class_instance
         intezer_class_instance._handle_subanalyses(
-            dummy_request_class_instance_instance, "blah", "blah", {}, parent_result_section)
+            dummy_request_class_instance, "blah", "blah", {}, parent_result_section)
         assert check_section_equality(parent_result_section.subsections[0], correct_result_section)
         assert check_section_equality(parent_result_section.subsections[1], correct_process_tree)
-        assert dummy_request_class_instance_instance.extracted[0]["description"] == "Extracted via blah blah"
-        assert dummy_request_class_instance_instance.extracted[0]["name"] == "blah2.sample"
+        assert dummy_request_class_instance.extracted[0]["description"] == "Extracted via blah blah"
+        assert dummy_request_class_instance.extracted[0]["name"] == "blah2.sample"
 
     @staticmethod
     @pytest.mark.parametrize("families, file_verdict_map, correct_fvp",
@@ -762,8 +761,8 @@ class TestIntezer:
         command_line_set = set()
         correct_processes = [
             {
-                "start_time": '1-01-01 00:00:00',
-                "end_time": '9999-12-31 23:59:59',
+                "start_time": '1-01-01 00:00:00.000000',
+                "end_time": '9999-12-31 23:59:59.999999',
                 "objectid": {
                     'ontology_id': 'process_FgezEeHOzrsPT9RyqA3MZ',
                     'processtree': None,
@@ -772,7 +771,7 @@ class TestIntezer:
                     "tag": "blah.exe",
                     "treeid": None,
                     "processtree": None,
-                    "time_observed": '1-01-01 00:00:00'
+                    "time_observed": '1-01-01 00:00:00.000000'
                 },
                 'pobjectid': {
                     'ontology_id': 'process_3gQblYLmzfdmdQEWr6IOAw',
@@ -780,7 +779,7 @@ class TestIntezer:
                     'service_name': 'IntezerStatic',
                     'session': None,
                     'tag': 'blah3.exe',
-                    'time_observed': '1-01-01 00:00:00',
+                    'time_observed': '1-01-01 00:00:00.000000',
                     'treeid': None
                 },
                 "pimage": "blah3.exe",
@@ -794,8 +793,8 @@ class TestIntezer:
                 "original_file_name": None,
             },
             {
-                "start_time": '1-01-01 00:00:00',
-                "end_time": '9999-12-31 23:59:59',
+                "start_time": '1-01-01 00:00:00.000000',
+                "end_time": '9999-12-31 23:59:59.999999',
                 "objectid": {
                     'ontology_id': 'process_3mkF9MLqHlxJQCAG7ViEOu',
                     'processtree': None,
@@ -804,7 +803,7 @@ class TestIntezer:
                     "tag": "blah2.exe",
                     "treeid": None,
                     "processtree": None,
-                    "time_observed": '1-01-01 00:00:00'
+                    "time_observed": '1-01-01 00:00:00.000000'
                 },
                 'pobjectid': {
                     'ontology_id': 'process_3gQblYLmzfdmdQEWr6IOAw',
@@ -812,7 +811,7 @@ class TestIntezer:
                     'service_name': 'IntezerStatic',
                     'session': None,
                     'tag': 'blah3.exe',
-                    'time_observed': '1-01-01 00:00:00',
+                    'time_observed': '1-01-01 00:00:00.000000',
                     'treeid': None
                 },
                 "pimage": "blah3.exe",
@@ -826,8 +825,8 @@ class TestIntezer:
                 "original_file_name": None,
             },
             {
-                "start_time": '1-01-01 00:00:00',
-                "end_time": '9999-12-31 23:59:59',
+                "start_time": '1-01-01 00:00:00.000000',
+                "end_time": '9999-12-31 23:59:59.999999',
                 "objectid": {
                     'ontology_id': 'process_3gQblYLmzfdmdQEWr6IOAw',
                     'processtree': None,
@@ -836,7 +835,7 @@ class TestIntezer:
                     "tag": "blah3.exe",
                     "treeid": None,
                     "processtree": None,
-                    "time_observed": '1-01-01 00:00:00'
+                    "time_observed": '1-01-01 00:00:00.000000'
                 },
                 'pobjectid': None,
                 "pimage": None,
