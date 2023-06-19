@@ -220,18 +220,19 @@ def dummy_api_interface_class():
 
 
 @pytest.fixture
-def dummy_request_class():
+def dummy_request_class_instance():
 
     class DummyRequest():
         def __init__(self):
             self.file_path = "blah"
             self.file_name = "blah"
             self.extracted = []
+            self.file_type = "executable/windows/pe64"
 
         def add_extracted(self, path, name, description):
             self.extracted.append({"path": path, "name": name, "description": description})
 
-    yield DummyRequest
+    yield DummyRequest()
 
 
 @pytest.fixture
@@ -357,7 +358,7 @@ class TestIntezer:
 
     @staticmethod
     def test_submit_file_for_analysis(
-            intezer_class_instance, dummy_request_class, dummy_get_response_class, dummy_api_interface_class,
+            intezer_class_instance, dummy_request_class_instance, dummy_get_response_class, dummy_api_interface_class,
             mocker):
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
@@ -367,25 +368,47 @@ class TestIntezer:
                             return_value=dummy_get_response_class("succeeded"))
         mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={})
         mocker.patch("intezer.sleep")
-        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
 
         mocker.patch.object(ALIntezerApi, "get_file_analysis_response", return_value=dummy_get_response_class("failed"))
-        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
 
         mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(
             415, dummy_get_response_class("blah")))
-        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
 
         mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(
             413, dummy_get_response_class("blah")))
-        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
 
         mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(
             500, dummy_get_response_class("blah")))
-        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
 
         mocker.patch("intezer.time", return_value=float("inf"))
-        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class(), "blah") == {}
+        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
+
+    @staticmethod
+    @pytest.mark.parametrize("main_api_result, verdict, expected_output",
+        [
+            # No input, no output
+            ({}, None, None),
+            # Verdict is not a case in the if statement
+            ({}, "blah", "blah"),
+            # Verdict is in NOT_SUPPORTED_VERDICTS
+            ({}, "file_type_not_supported", None),
+            # Verdict is FAILED
+            ({}, "failed", None),
+            # Verdict is in TRUSTED_VERDICTS
+            ({}, "known_trusted", None),
+            # Verdict is suspicious, sub verdict is "probably packed"
+            ({"sub_verdict": "probably_packed"}, "suspicious", "probably_packed"),
+            # Verdict is suspicious, sub verdict is "administration tool"
+            ({"sub_verdict": "administration_tool"}, "suspicious", "administration_tool"),
+        ]
+    )
+    def test_massage_verdict(main_api_result, verdict, expected_output, dummy_request_class_instance, intezer_class_instance):
+        assert intezer_class_instance._massage_verdict(dummy_request_class_instance, None, main_api_result, verdict) == expected_output
 
     @staticmethod
     @pytest.mark.parametrize("details, uninteresting_keys, expected_output",
@@ -424,6 +447,17 @@ class TestIntezer:
 
         result_section = ResultSection("blah")
         intezer_class_instance._set_heuristic_by_verdict(result_section, "interesting")
+        assert result_section.heuristic.heur_id == 3
+
+        result_section = ResultSection("blah")
+        intezer_class_instance._set_heuristic_by_verdict(result_section, "administration_tool")
+        assert result_section.heuristic.heur_id == 2
+
+        result_section = ResultSection("blah")
+        intezer_class_instance.config = {
+            "score_administration_tools": False
+        }
+        intezer_class_instance._set_heuristic_by_verdict(result_section, "administration_tool")
         assert result_section.heuristic.heur_id == 3
 
     @staticmethod
@@ -573,14 +607,14 @@ class TestIntezer:
         assert check_section_equality(ioc_table, correct_ioc_res_sec)
 
     @staticmethod
-    def test_handle_subanalyses(intezer_class_instance, dummy_request_class, dummy_api_interface_class, mocker):
+    def test_handle_subanalyses(intezer_class_instance, dummy_request_class_instance, dummy_api_interface_class, mocker):
         mocker.patch.object(intezer_class_instance, "get_api_interface", return_value=dummy_api_interface_class)
         intezer_class_instance.start()
 
         mocker.patch.object(intezer_class_instance.client, "get_sub_analyses_by_id", return_value=[])
         parent_result_section = ResultSection("blah")
         intezer_class_instance._handle_subanalyses(
-            dummy_request_class(), "blah", "blah", {}, parent_result_section)
+            dummy_request_class_instance, "blah", "blah", {}, parent_result_section)
         assert parent_result_section.subsections == []
 
         mocker.patch.object(
@@ -631,7 +665,6 @@ class TestIntezer:
         correct_process_tree.add_process(ProcessItem(pid=124, name="blah2.exe", cmd=None))
         correct_process_tree.add_tag("dynamic.processtree_id", "blah2.exe")
         correct_process_tree.add_tag("dynamic.process.file_name", "blah2.exe")
-        dummy_request_class_instance = dummy_request_class()
         intezer_class_instance._handle_subanalyses(
             dummy_request_class_instance, "blah", "blah", {}, parent_result_section)
         assert check_section_equality(parent_result_section.subsections[0], correct_result_section)
@@ -728,8 +761,8 @@ class TestIntezer:
         command_line_set = set()
         correct_processes = [
             {
-                "start_time": '1-01-01 00:00:00',
-                "end_time": '9999-12-31 23:59:59',
+                "start_time": '1-01-01 00:00:00.000000',
+                "end_time": '9999-12-31 23:59:59.999999',
                 "objectid": {
                     'ontology_id': 'process_FgezEeHOzrsPT9RyqA3MZ',
                     'processtree': None,
@@ -738,7 +771,7 @@ class TestIntezer:
                     "tag": "blah.exe",
                     "treeid": None,
                     "processtree": None,
-                    "time_observed": '1-01-01 00:00:00'
+                    "time_observed": '1-01-01 00:00:00.000000'
                 },
                 'pobjectid': {
                     'ontology_id': 'process_3gQblYLmzfdmdQEWr6IOAw',
@@ -746,7 +779,7 @@ class TestIntezer:
                     'service_name': 'IntezerStatic',
                     'session': None,
                     'tag': 'blah3.exe',
-                    'time_observed': '1-01-01 00:00:00',
+                    'time_observed': '1-01-01 00:00:00.000000',
                     'treeid': None
                 },
                 "pimage": "blah3.exe",
@@ -760,8 +793,8 @@ class TestIntezer:
                 "original_file_name": None,
             },
             {
-                "start_time": '1-01-01 00:00:00',
-                "end_time": '9999-12-31 23:59:59',
+                "start_time": '1-01-01 00:00:00.000000',
+                "end_time": '9999-12-31 23:59:59.999999',
                 "objectid": {
                     'ontology_id': 'process_3mkF9MLqHlxJQCAG7ViEOu',
                     'processtree': None,
@@ -770,7 +803,7 @@ class TestIntezer:
                     "tag": "blah2.exe",
                     "treeid": None,
                     "processtree": None,
-                    "time_observed": '1-01-01 00:00:00'
+                    "time_observed": '1-01-01 00:00:00.000000'
                 },
                 'pobjectid': {
                     'ontology_id': 'process_3gQblYLmzfdmdQEWr6IOAw',
@@ -778,7 +811,7 @@ class TestIntezer:
                     'service_name': 'IntezerStatic',
                     'session': None,
                     'tag': 'blah3.exe',
-                    'time_observed': '1-01-01 00:00:00',
+                    'time_observed': '1-01-01 00:00:00.000000',
                     'treeid': None
                 },
                 "pimage": "blah3.exe",
@@ -792,8 +825,8 @@ class TestIntezer:
                 "original_file_name": None,
             },
             {
-                "start_time": '1-01-01 00:00:00',
-                "end_time": '9999-12-31 23:59:59',
+                "start_time": '1-01-01 00:00:00.000000',
+                "end_time": '9999-12-31 23:59:59.999999',
                 "objectid": {
                     'ontology_id': 'process_3gQblYLmzfdmdQEWr6IOAw',
                     'processtree': None,
@@ -802,7 +835,7 @@ class TestIntezer:
                     "tag": "blah3.exe",
                     "treeid": None,
                     "processtree": None,
-                    "time_observed": '1-01-01 00:00:00'
+                    "time_observed": '1-01-01 00:00:00.000000'
                 },
                 'pobjectid': None,
                 "pimage": None,
