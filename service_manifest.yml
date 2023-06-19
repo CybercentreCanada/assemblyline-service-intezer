@@ -30,6 +30,7 @@ config:
   try_to_download_every_file: false
   download_subfiles: true
   min_malware_genes: 5
+  score_administration_tools: true
 
 submission_params:
   - default: true

@@ -73,6 +73,7 @@ COMPLETED_STATUSES = [AnalysisStatusCode.FINISH.value, AnalysisStatusCode.FAILED
 
 CANNOT_EXTRACT_ARCHIVE = "Cannot extract archive"
 GENERIC_MALWARE = "Generic Malware"
+NOT_APPLICABLE = "Not Applicable"
 
 # Defaults
 DEFAULT_ANALYSIS_TIMEOUT = 180
@@ -564,25 +565,9 @@ class Intezer(ServiceBase):
             main_api_result = main_api_result_from_retrieval
 
         verdict = main_api_result.get("verdict")
-        if verdict in Verdicts.NOT_SUPPORTED_VERDICTS.value:
-            self.log.debug(f"Unsupported file type: {request.file_type}")
-            request.result = result
+        verdict = self._massage_verdict(request, result, main_api_result, verdict)
+        if not verdict:
             return
-        elif verdict == AnalysisStatusCode.FAILED.value:
-            self.log.warning("The Intezer server is not feeling well :(")
-            request.result = result
-            return
-        elif verdict in Verdicts.TRUSTED_VERDICTS.value:
-            self.log.debug(f"The verdict was {verdict}. No need to report it.")
-            request.result = result
-            return
-        # If the verdict is suspicious and the sub-verdict is "probably packed", then this should be assigned as
-        # "interesting" and not "suspicious"
-        elif verdict == Verdicts.SUSPICIOUS.value and \
-            main_api_result.get("sub_verdict") == Verdicts.PROBABLY_PACKED.value:
-            self.log.debug("The verdict was 'suspicious' and the sub-verdict was 'probably packed'. "
-                           "Set verdict to 'probably packed'.")
-            verdict = main_api_result["sub_verdict"]
 
         analysis_id = main_api_result["analysis_id"]
 
@@ -592,14 +577,16 @@ class Intezer(ServiceBase):
             main_api_result.copy(), UNINTERESTING_ANALYSIS_KEYS
         )
         main_kv_section.update_items(processed_main_api_result)
-        if "family_name" in main_api_result and main_api_result["family_name"] != GENERIC_MALWARE:
-            # Tag both, ask forgiveness later
-            main_kv_section.add_tag(
-                "attribution.implant", main_api_result["family_name"]
-            )
-            main_kv_section.add_tag(
-                "attribution.actor", main_api_result["family_name"]
-            )
+        if "family_name" in main_api_result and main_api_result["family_name"] not in [GENERIC_MALWARE, NOT_APPLICABLE]:
+            # Don't tag administration tool families
+            if verdict != Verdicts.ADMINISTRATION_TOOL.value:
+                # Tag both, ask forgiveness later
+                main_kv_section.add_tag(
+                    "attribution.implant", main_api_result["family_name"]
+                )
+                main_kv_section.add_tag(
+                    "attribution.actor", main_api_result["family_name"]
+                )
 
         # This file-verdict map will be used later on to assign heuristics to sub-analyses
         file_verdict_map = {}
@@ -640,7 +627,7 @@ class Intezer(ServiceBase):
         This method handles the logic for submitting a file for analysis and polling for the result
         :param request: The service request object
         :param sha256: The hash of the given file
-        :return: None
+        :return: A dictionary representing the Intezer analysis
         """
         self.log.debug(f"Submitting {sha256} for analysis...")
         start_time = time()
@@ -675,6 +662,46 @@ class Intezer(ServiceBase):
         return self.client.get_latest_analysis(
             file_hash=sha256, private_only=self.config["private_only"]
         )
+
+    def _massage_verdict(
+            self, request: ServiceRequest, result: Result, main_api_result: Dict[str, str], verdict: str
+        ) -> Optional[str]:
+        """
+        This method massages the given verdict according to certain verdict lists / config options
+        :param request: The ServiceRequest object
+        :param result: The Result object
+        :param main_api_result: A dictionary representing the Intezer analysis
+        :return: A string representing the verdict, or None
+        """
+        if verdict in Verdicts.NOT_SUPPORTED_VERDICTS.value:
+            self.log.debug(f"Unsupported file type: {request.file_type}")
+            request.result = result
+            return None
+        elif verdict == AnalysisStatusCode.FAILED.value:
+            self.log.warning("The Intezer server is not feeling well :(")
+            request.result = result
+            return None
+        elif verdict in Verdicts.TRUSTED_VERDICTS.value:
+            self.log.debug(f"The verdict was {verdict}. No need to report it.")
+            request.result = result
+            return None
+        # If the verdict is suspicious and the sub-verdict is "probably packed", then this should be assigned as
+        # "interesting" and not "suspicious"
+        elif verdict == Verdicts.SUSPICIOUS.value and \
+            main_api_result.get("sub_verdict") == Verdicts.PROBABLY_PACKED.value:
+            self.log.debug("The verdict was 'suspicious' and the sub-verdict was 'probably packed'. "
+                           "Set verdict to 'probably packed'.")
+            verdict = main_api_result["sub_verdict"]
+
+        # If the verdict is suspicious and the sub-verdict is "administration tool", then this should be assigned as
+        # "interesting" and not "suspicious"
+        elif verdict == Verdicts.SUSPICIOUS.value and \
+            main_api_result.get("sub_verdict") == Verdicts.ADMINISTRATION_TOOL.value:
+            self.log.debug("The verdict was 'suspicious' and the sub-verdict was 'administration tool'. "
+                           "Set verdict to 'administration tool'.")
+            verdict = main_api_result["sub_verdict"]
+
+        return verdict
 
     @staticmethod
     def _process_details(
@@ -712,6 +739,12 @@ class Intezer(ServiceBase):
         :return: None
         """
         if not verdict:
+            return
+
+        # If we do not want to score administration tools as suspicious, then don't!
+        if not self.config.get("score_administration_tools", True) and verdict == Verdicts.ADMINISTRATION_TOOL.value:
+            # We will score this file as interesting instead
+            result_section.set_heuristic(3)
             return
 
         if (
