@@ -1,6 +1,10 @@
 # Intezer service
 This repository is an Assemblyline service that fetches the Intezer Analyze report for the SHA256 of a submitted file, and (optionally!) if the SHA256 was not found on the Intezer Analyze instance, then this service will submit that file.
 
+It was created by [x1mus](https://github.com/x1mus) with support from [Sorakurai](https://github.com/Sorakurai) and [reynas](https://github.com/reynas) at [NVISO](https://github.com/NVISOsecurity).
+
+It has since been passed over to the CCCS :canada: for maintenance!
+
 **NOTE**: This service **requires** you to have your own API key (Paid or Free). It is **not** preinstalled during a default installation.
 
 **NOTE!**: This service **requires** extensive setup prior to installation if you are deploying your own instance of IntezerAnalyze.
