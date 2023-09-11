@@ -6,6 +6,7 @@ from multiprocessing import Process
 import pytest
 import requests_mock
 from assemblyline.common import log
+from assemblyline.common.exceptions import NonRecoverableError
 from assemblyline.odm.messages.task import Task as ServiceTask
 from assemblyline_service_utilities.common.dynamic_service_helper import OntologyResults
 from assemblyline_service_utilities.testing.helper import check_section_equality
@@ -262,19 +263,23 @@ class TestIntezer:
         assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
 
         mocker.patch.object(ALIntezerApi, "get_file_analysis_response", return_value=dummy_get_response_class("failed"))
-        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
+        with pytest.raises(NonRecoverableError):
+            intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah")
 
         mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(
             415, dummy_get_response_class("blah")))
-        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
+        with pytest.raises(NonRecoverableError):
+            intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah")
 
         mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(
             413, dummy_get_response_class("blah")))
-        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
+        with pytest.raises(NonRecoverableError):
+            intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah")
 
         mocker.patch.object(IntezerApi, "analyze_by_file", side_effect=ServerError(
             500, dummy_get_response_class("blah")))
-        assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
+        with pytest.raises(NonRecoverableError):
+            intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah")
 
         mocker.patch("intezer.time", return_value=float("inf"))
         assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
@@ -486,8 +491,8 @@ class TestIntezer:
         correct_res_sec.add_tag("dynamic.registry_key", "HKEY\\Registry\\Key\\Path")
         correct_res_sec.add_tag("network.dynamic.domain", "blah.ca")
         correct_ioc_res_sec = ResultTableSection("blah")
-        correct_ioc_res_sec.add_row(TableRow(ioc_type="ip", ioc="2.2.2.2"))
         correct_ioc_res_sec.add_row(TableRow(ioc_type="domain", ioc="blah.com"))
+        correct_ioc_res_sec.add_row(TableRow(ioc_type="ip", ioc="2.2.2.2"))
         correct_ioc_res_sec.add_row(TableRow(ioc_type="uri", ioc="http://blah.com/blah"))
         correct_ioc_res_sec.add_row(TableRow(ioc_type="uri_path", ioc="/blah"))
         correct_ioc_res_sec.add_tag("network.dynamic.ip", "2.2.2.2")
