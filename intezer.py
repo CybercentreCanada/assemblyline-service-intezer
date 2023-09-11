@@ -3,6 +3,7 @@ from http import HTTPStatus
 from time import sleep, time
 from typing import Any, Dict, List, Optional, Set
 
+from assemblyline.common.exceptions import NonRecoverableError
 from assemblyline.common.str_utils import truncate
 from assemblyline.odm.models.ontology.results.process import Process as ProcessModel
 from assemblyline_service_utilities.common.dynamic_service_helper import (
@@ -656,8 +657,9 @@ class Intezer(ServiceBase):
                 f"Intezer was unable to scan the file {sha256} within the analysis timeout. Scan was stuck in '{status}'.")
 
         if status == AnalysisStatusCode.FAILED.value:
-            self.log.warning(f"{sha256} caused Intezer to crash.")
-            return {}
+            msg = f"{sha256} caused Intezer to crash."
+            self.log.warning(msg)
+            raise NonRecoverableError(msg)
 
         return self.client.get_latest_analysis(
             file_hash=sha256, private_only=self.config["private_only"]
