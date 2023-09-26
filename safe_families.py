@@ -23,5 +23,5 @@ SAFE_FAMILIES = {
     ],
     "packer": [
         "UPX",
-    ]
+    ],
 }
