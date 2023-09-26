@@ -56,11 +56,7 @@ FAMILIES_TO_NOT_TAG = ["application", "library"]
 MALICIOUS_FAMILY_TYPES = ["malware"]
 FAMILY_TYPES_OF_INTEREST = ["administration_tool", "packer"]
 
-TTP_SEVERITY_TRANSLATION = {
-    1: 10,
-    2: 100,
-    3: 250
-}
+TTP_SEVERITY_TRANSLATION = {1: 10, 2: 100, 3: 250}
 
 SILENT_SIGNATURES = ["enumerates_running_processes"]
 COMMAND_LINE_KEYS = ["command", "cmdline", "Commandline executed"]
@@ -149,19 +145,15 @@ class ALIntezerApi(IntezerApi):
         self.retry_forever: bool = retry_forever
 
     # Overriding the class method to handle if the URL is GONE
-    def get_latest_analysis(self,
-                            file_hash: str,
-                            private_only: bool = False,
-                            **additional_parameters) -> Optional[Dict]:
+    def get_latest_analysis(
+        self, file_hash: str, private_only: bool = False, **additional_parameters
+    ) -> Optional[Dict]:
         # We will try to connect with the REST API... NO MATTER WHAT
         logged = False
         while True:
             try:
                 return IntezerApi.get_latest_analysis(
-                    self=self,
-                    file_hash=file_hash,
-                    private_only=private_only,
-                    **additional_parameters
+                    self=self, file_hash=file_hash, private_only=private_only, **additional_parameters
                 )
             except ConnectionError as e:
                 if not logged:
@@ -178,16 +170,12 @@ class ALIntezerApi(IntezerApi):
             except HTTPError as e:
                 # Occasionally an analysis fails, and HTTPError.GONE is raised
                 if str(HTTPStatus.GONE.value) in repr(e) or HTTPStatus.GONE.name in repr(e):
-                    self.log.debug(
-                        f"Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'."
-                    )
+                    self.log.debug(f"Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'.")
                     return None
                 # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
                 # per https://github.com/CybercentreCanada/assemblyline-service-intezer/issues/31
                 elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
-                    self.log.debug(
-                        f"Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'."
-                    )
+                    self.log.debug(f"Unable to get the latest analysis for SHA256 {file_hash} due to '{e}'.")
                     return None
                 else:
                     if not logged:
@@ -224,16 +212,12 @@ class ALIntezerApi(IntezerApi):
             except HTTPError as e:
                 # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
                 if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
-                    self.log.debug(
-                        f"Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'."
-                    )
+                    self.log.debug(f"Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'.")
                     return {"files": [], "network": []}
                 # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
                 # per https://github.com/CybercentreCanada/assemblyline-service-intezer/issues/31
                 elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
-                    self.log.debug(
-                        f"Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'."
-                    )
+                    self.log.debug(f"Unable to retrieve IOCs for analysis ID {analysis_id} due to '{e}'.")
                     return {"files": [], "network": []}
                 else:
                     if not logged:
@@ -270,16 +254,12 @@ class ALIntezerApi(IntezerApi):
             except HTTPError as e:
                 # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
                 if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
-                    self.log.debug(
-                        f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'."
-                    )
+                    self.log.debug(f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'.")
                     return []
                 # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
                 # per https://github.com/CybercentreCanada/assemblyline-service-intezer/issues/31
                 elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
-                    self.log.debug(
-                        f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'."
-                    )
+                    self.log.debug(f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'.")
                     return []
                 else:
                     if not logged:
@@ -294,9 +274,7 @@ class ALIntezerApi(IntezerApi):
                     else:
                         raise
             except UnsupportedOnPremiseVersion as e:
-                self.log.debug(
-                    f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'."
-                )
+                self.log.debug(f"Unable to retrieve TTPs for analysis ID {analysis_id} due to '{e}'.")
                 return []
 
     # Overriding the class method to handle if the HTTPError exists
@@ -319,9 +297,7 @@ class ALIntezerApi(IntezerApi):
                 else:
                     raise
             except HTTPError as e:
-                self.log.debug(
-                    f"Unable to get sub_analyses for analysis ID {analysis_id} due to '{e}'."
-                )
+                self.log.debug(f"Unable to get sub_analyses for analysis ID {analysis_id} due to '{e}'.")
                 return []
 
     # Overriding the class method to handle if the network connection cannot be made
@@ -346,9 +322,7 @@ class ALIntezerApi(IntezerApi):
                 else:
                     raise
             except HTTPError as e:
-                self.log.debug(
-                    f"Unable to get sub_analyses code re-use for analysis ID {analysis_id} due to '{e}'."
-                )
+                self.log.debug(f"Unable to get sub_analyses code re-use for analysis ID {analysis_id} due to '{e}'.")
                 return None
 
     # Overriding the class method to handle if the network connection cannot be made
@@ -384,9 +358,7 @@ class ALIntezerApi(IntezerApi):
         logged = False
         while True:
             try:
-                IntezerApi.download_file_by_sha256(
-                    self=self, sha256=sha256, path=dir_path
-                )
+                IntezerApi.download_file_by_sha256(self=self, sha256=sha256, path=dir_path)
                 return True
             except ConnectionError as e:
                 if not logged:
@@ -403,16 +375,12 @@ class ALIntezerApi(IntezerApi):
             except HTTPError as e:
                 # If you have a community account with analyze.intezer.com, you will get a 403 FORBIDDEN on this endpoint.
                 if str(HTTPStatus.FORBIDDEN.value) in repr(e) or HTTPStatus.FORBIDDEN.name in repr(e):
-                    self.log.debug(
-                        f"Unable to download file for SHA256 {sha256} due to '{e}'."
-                    )
+                    self.log.debug(f"Unable to download file for SHA256 {sha256} due to '{e}'.")
                     return False
                 # This issue can occur with certain private accounts on the public instance of analyze.intezer.com as
                 # per https://github.com/CybercentreCanada/assemblyline-service-intezer/issues/31
                 elif str(HTTPStatus.NOT_FOUND.value) in repr(e) or HTTPStatus.NOT_FOUND.name in repr(e):
-                    self.log.debug(
-                        f"Unable to download file for SHA256 {sha256} due to '{e}'."
-                    )
+                    self.log.debug(f"Unable to download file for SHA256 {sha256} due to '{e}'.")
                     return False
                 else:
                     if not logged:
@@ -428,9 +396,7 @@ class ALIntezerApi(IntezerApi):
                         raise
             except FileExistsError as e:
                 # Duplicate file
-                self.log.debug(
-                    f"Unable to download file for SHA256 {sha256} due to '{e}'."
-                )
+                self.log.debug(f"Unable to download file for SHA256 {sha256} due to '{e}'.")
                 return False
 
     # Overriding the class method to handle if the ServerError exists
@@ -440,7 +406,8 @@ class ALIntezerApi(IntezerApi):
         while True:
             try:
                 return IntezerApi.analyze_by_file(
-                    self=self, file_path=file_path, file_name=file_name, verify_file_support=verify_file_support)
+                    self=self, file_path=file_path, file_name=file_name, verify_file_support=verify_file_support
+                )
             except ConnectionError as e:
                 if not logged:
                     self.log.error(
@@ -455,25 +422,26 @@ class ALIntezerApi(IntezerApi):
                     raise
             except ServerError as e:
                 # If you submit a file that Intezer doesn't support, you will get a 415 UNSUPPORTED_MEDIA_TYPE on this endpoint.
-                if str(HTTPStatus.UNSUPPORTED_MEDIA_TYPE.value) in repr(e) or HTTPStatus.UNSUPPORTED_MEDIA_TYPE.name in repr(e):
-                    self.log.debug(
-                        f"Unable to analyze file for SHA256 {sha256} due to '{e}'."
-                    )
+                if str(HTTPStatus.UNSUPPORTED_MEDIA_TYPE.value) in repr(
+                    e
+                ) or HTTPStatus.UNSUPPORTED_MEDIA_TYPE.name in repr(e):
+                    self.log.debug(f"Unable to analyze file for SHA256 {sha256} due to '{e}'.")
                     return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
-                elif str(HTTPStatus.INTERNAL_SERVER_ERROR.value) in repr(e) or HTTPStatus.INTERNAL_SERVER_ERROR.name in repr(e):
-                    self.log.debug(
-                        f"Unable to analyze file for SHA256 {sha256} due to '{e}'."
-                    )
+                elif str(HTTPStatus.INTERNAL_SERVER_ERROR.value) in repr(
+                    e
+                ) or HTTPStatus.INTERNAL_SERVER_ERROR.name in repr(e):
+                    self.log.debug(f"Unable to analyze file for SHA256 {sha256} due to '{e}'.")
                     return AnalysisStatusCode.FAILED.value
                 elif CANNOT_EXTRACT_ARCHIVE in repr(e):
                     self.log.warning(
-                        f"Unable to extract archive for SHA256 {sha256}, possibly because it is password-protected.")
+                        f"Unable to extract archive for SHA256 {sha256}, possibly because it is password-protected."
+                    )
                     return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
                 # If you submit a file that is too big for Intezer, you will get a 413 REQUEST_ENTITY_TOO_LARGE on this endpoint.
-                elif str(HTTPStatus.REQUEST_ENTITY_TOO_LARGE.value) in repr(e) or HTTPStatus.REQUEST_ENTITY_TOO_LARGE.name in repr(e):
-                    self.log.debug(
-                        f"Unable to analyze file for SHA256 {sha256} due to '{e}'."
-                    )
+                elif str(HTTPStatus.REQUEST_ENTITY_TOO_LARGE.value) in repr(
+                    e
+                ) or HTTPStatus.REQUEST_ENTITY_TOO_LARGE.name in repr(e):
+                    self.log.debug(f"Unable to analyze file for SHA256 {sha256} due to '{e}'.")
                     return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
                 else:
                     if not logged:
@@ -495,7 +463,8 @@ class ALIntezerApi(IntezerApi):
         while True:
             try:
                 return IntezerApi.get_file_analysis_response(
-                    self=self, analyses_id=analysis_id, ignore_not_found=ignore_not_found)
+                    self=self, analyses_id=analysis_id, ignore_not_found=ignore_not_found
+                )
             except (ConnectionError, HTTPError) as e:
                 if not logged:
                     self.log.error(
@@ -522,13 +491,14 @@ class Intezer(ServiceBase):
 
         if self.config.get("base_url") != BASE_URL and not self.config["is_on_premise"]:
             self.log.warning(
-                f"You are using a base url that is not {BASE_URL}, yet you do not have the 'is_on_premise' parameter set to true. Are you sure?")
+                f"You are using a base url that is not {BASE_URL}, yet you do not have the 'is_on_premise' parameter set to true. Are you sure?"
+            )
 
         self.client = ALIntezerApi(
             api_version=self.config.get("api_version", API_VERSION),
             api_key=self.config["api_key"],
             base_url=self.config.get("base_url", BASE_URL),
-            on_premise_version=OnPremiseVersion.V21_11 if self.config["is_on_premise"] else None
+            on_premise_version=OnPremiseVersion.V21_11 if self.config["is_on_premise"] else None,
         )
         self.client.set_logger(self.log)
         self.client.set_retry_forever(self.config.get("retry_forever", False))
@@ -545,7 +515,7 @@ class Intezer(ServiceBase):
         result = Result()
 
         # First, let's get the analysis metadata, if it exists on the system
-        main_api_result_from_retrieval = self._get_analysis_metadata(request.get_param('analysis_id'), sha256)
+        main_api_result_from_retrieval = self._get_analysis_metadata(request.get_param("analysis_id"), sha256)
 
         if not main_api_result_from_retrieval:
             self.log.debug(f"{sha256} is not on the system.")
@@ -558,7 +528,8 @@ class Intezer(ServiceBase):
                     main_api_result = main_api_result_from_submission
             else:
                 self.log.debug(
-                    f"The user has requested that {sha256} not be sent to the system for analysis. Exiting...")
+                    f"The user has requested that {sha256} not be sent to the system for analysis. Exiting..."
+                )
                 request.result = result
                 return
         else:
@@ -574,20 +545,14 @@ class Intezer(ServiceBase):
 
         # Setup the main result section
         main_kv_section = ResultKeyValueSection("Intezer analysis report")
-        processed_main_api_result = self._process_details(
-            main_api_result.copy(), UNINTERESTING_ANALYSIS_KEYS
-        )
+        processed_main_api_result = self._process_details(main_api_result.copy(), UNINTERESTING_ANALYSIS_KEYS)
         main_kv_section.update_items(processed_main_api_result)
         if "family_name" in main_api_result and main_api_result["family_name"] not in [GENERIC_MALWARE, NOT_APPLICABLE]:
             # Don't tag administration tool families
             if verdict != Verdicts.ADMINISTRATION_TOOL.value:
                 # Tag both, ask forgiveness later
-                main_kv_section.add_tag(
-                    "attribution.implant", main_api_result["family_name"]
-                )
-                main_kv_section.add_tag(
-                    "attribution.actor", main_api_result["family_name"]
-                )
+                main_kv_section.add_tag("attribution.implant", main_api_result["family_name"])
+                main_kv_section.add_tag("attribution.actor", main_api_result["family_name"])
 
         # This file-verdict map will be used later on to assign heuristics to sub-analyses
         file_verdict_map = {}
@@ -617,9 +582,7 @@ class Intezer(ServiceBase):
         """
         # NOTE: If a user requests a certain analysis id, then the submitted file will be ignored
         if not analysis_id:
-            return self.client.get_latest_analysis(
-                file_hash=sha256, private_only=self.config["private_only"]
-            )
+            return self.client.get_latest_analysis(file_hash=sha256, private_only=self.config["private_only"])
         else:
             return {"analysis_id": analysis_id, "verdict": None}
 
@@ -635,7 +598,8 @@ class Intezer(ServiceBase):
 
         # Send the file
         analysis_id = self.client.analyze_by_file(
-            sha256=sha256, file_path=request.file_path, file_name=request.file_name, verify_file_support=True)
+            sha256=sha256, file_path=request.file_path, file_name=request.file_name, verify_file_support=True
+        )
         if analysis_id in [Verdicts.FILE_TYPE_NOT_SUPPORTED.value, AnalysisStatusCode.FAILED.value]:
             return {"verdict": analysis_id}
 
@@ -654,20 +618,19 @@ class Intezer(ServiceBase):
 
         if elapsed_time > analysis_timeout:
             self.log.warning(
-                f"Intezer was unable to scan the file {sha256} within the analysis timeout. Scan was stuck in '{status}'.")
+                f"Intezer was unable to scan the file {sha256} within the analysis timeout. Scan was stuck in '{status}'."
+            )
 
         if status == AnalysisStatusCode.FAILED.value:
             msg = f"{sha256} caused Intezer to crash."
             self.log.warning(msg)
             raise NonRecoverableError(msg)
 
-        return self.client.get_latest_analysis(
-            file_hash=sha256, private_only=self.config["private_only"]
-        )
+        return self.client.get_latest_analysis(file_hash=sha256, private_only=self.config["private_only"])
 
     def _massage_verdict(
-            self, request: ServiceRequest, result: Result, main_api_result: Dict[str, str], verdict: str
-        ) -> Optional[str]:
+        self, request: ServiceRequest, result: Result, main_api_result: Dict[str, str], verdict: str
+    ) -> Optional[str]:
         """
         This method massages the given verdict according to certain verdict lists / config options
         :param request: The ServiceRequest object
@@ -689,26 +652,32 @@ class Intezer(ServiceBase):
             return None
         # If the verdict is suspicious and the sub-verdict is "probably packed", then this should be assigned as
         # "interesting" and not "suspicious"
-        elif verdict == Verdicts.SUSPICIOUS.value and \
-            main_api_result.get("sub_verdict") == Verdicts.PROBABLY_PACKED.value:
-            self.log.debug("The verdict was 'suspicious' and the sub-verdict was 'probably packed'. "
-                           "Set verdict to 'probably packed'.")
+        elif (
+            verdict == Verdicts.SUSPICIOUS.value
+            and main_api_result.get("sub_verdict") == Verdicts.PROBABLY_PACKED.value
+        ):
+            self.log.debug(
+                "The verdict was 'suspicious' and the sub-verdict was 'probably packed'. "
+                "Set verdict to 'probably packed'."
+            )
             verdict = main_api_result["sub_verdict"]
 
         # If the verdict is suspicious and the sub-verdict is "administration tool", then this should be assigned as
         # "interesting" and not "suspicious"
-        elif verdict == Verdicts.SUSPICIOUS.value and \
-            main_api_result.get("sub_verdict") == Verdicts.ADMINISTRATION_TOOL.value:
-            self.log.debug("The verdict was 'suspicious' and the sub-verdict was 'administration tool'. "
-                           "Set verdict to 'administration tool'.")
+        elif (
+            verdict == Verdicts.SUSPICIOUS.value
+            and main_api_result.get("sub_verdict") == Verdicts.ADMINISTRATION_TOOL.value
+        ):
+            self.log.debug(
+                "The verdict was 'suspicious' and the sub-verdict was 'administration tool'. "
+                "Set verdict to 'administration tool'."
+            )
             verdict = main_api_result["sub_verdict"]
 
         return verdict
 
     @staticmethod
-    def _process_details(
-        details: Dict[str, str], uninteresting_keys: List[str]
-    ) -> Dict[str, str]:
+    def _process_details(details: Dict[str, str], uninteresting_keys: List[str]) -> Dict[str, str]:
         """
         This method removes uninteresting details from a given dictionary
         :param details: The dictionary possibly containing uninteresting details
@@ -721,7 +690,11 @@ class Intezer(ServiceBase):
 
             # Subanalysis indicators as of v22.1 are now a list of dictionaries containing "classification" and "name" keys
             # We only want the value of the "name" key
-            elif key == "indicators" and isinstance(details[key], list) and all(isinstance(item, dict) for item in details[key]):
+            elif (
+                key == "indicators"
+                and isinstance(details[key], list)
+                and all(isinstance(item, dict) for item in details[key])
+            ):
                 for index, item in enumerate(details[key]):
                     details[key][index] = item["name"]
 
@@ -731,9 +704,7 @@ class Intezer(ServiceBase):
 
         return details
 
-    def _set_heuristic_by_verdict(
-        self, result_section: ResultSection, verdict: Optional[str]
-    ) -> None:
+    def _set_heuristic_by_verdict(self, result_section: ResultSection, verdict: Optional[str]) -> None:
         """
         This method sets the heuristic of the result section based on the verdict
         :param result_section: The result section that will have its heuristic set
@@ -749,10 +720,7 @@ class Intezer(ServiceBase):
             result_section.set_heuristic(3)
             return
 
-        if (
-            verdict not in Verdicts.INTERESTING_VERDICTS.value
-            and verdict not in Verdicts.UNINTERESTING_VERDICTS.value
-        ):
+        if verdict not in Verdicts.INTERESTING_VERDICTS.value and verdict not in Verdicts.UNINTERESTING_VERDICTS.value:
             self.log.debug(f"{verdict} was spotted. Is this useful?")
         elif verdict in Verdicts.MALICIOUS_VERDICTS.value:
             result_section.set_heuristic(1)
@@ -822,16 +790,16 @@ class Intezer(ServiceBase):
 
         sigs_res = ResultSection("Signatures")
         for ttp in ttps:
-            sig_name = ttp['name']
+            sig_name = ttp["name"]
             sig_res = ResultTextSection(f"Signature: {sig_name}")
-            sig_res.add_line(ttp['description'])
+            sig_res.add_line(ttp["description"])
 
             heur_id = get_heur_id_for_signature_name(sig_name)
             if heur_id == GENERIC_HEURISTIC_ID:
                 self.log.debug(f"{sig_name} does not have a category assigned to it")
 
             sig_res.set_heuristic(heur_id)
-            sig_res.heuristic.add_signature_id(sig_name, TTP_SEVERITY_TRANSLATION[ttp['severity']])
+            sig_res.heuristic.add_signature_id(sig_name, TTP_SEVERITY_TRANSLATION[ttp["severity"]])
 
             for aid in get_attack_ids_for_signature_name(sig_name):
                 sig_res.heuristic.add_attack_id(aid)
@@ -841,7 +809,7 @@ class Intezer(ServiceBase):
                 continue
 
             ioc_table = ResultTableSection("IOCs found in signature marks")
-            self._process_ttp_data(ttp['data'], sig_res, ioc_table)
+            self._process_ttp_data(ttp["data"], sig_res, ioc_table)
 
             if ioc_table.body:
                 sig_res.add_subsection(ioc_table)
@@ -852,8 +820,8 @@ class Intezer(ServiceBase):
             parent_result_section.add_subsection(sigs_res)
 
     def _process_ttp_data(
-            self, ttp_data: List[Dict[str, str]],
-            sig_res: ResultSection, ioc_table: ResultTableSection) -> None:
+        self, ttp_data: List[Dict[str, str]], sig_res: ResultSection, ioc_table: ResultTableSection
+    ) -> None:
         """
         This method handles the processing of signature marks
         :param ttp_data: The marks for the signature
@@ -891,9 +859,14 @@ class Intezer(ServiceBase):
             elif sig_res.body and f"\t{key}: {value}" not in sig_res.body:
                 sig_res.add_line(f"\t{key}: {value}")
 
-    def _handle_subanalyses(self, request: ServiceRequest, sha256: str, analysis_id: str,
-                            file_verdict_map: Dict[str, str],
-                            parent_section: ResultSection) -> None:
+    def _handle_subanalyses(
+        self,
+        request: ServiceRequest,
+        sha256: str,
+        analysis_id: str,
+        file_verdict_map: Dict[str, str],
+        parent_section: ResultSection,
+    ) -> None:
         """
         This method handles the subanalyses for a given analysis ID
         :param request: The service request object
@@ -927,9 +900,7 @@ class Intezer(ServiceBase):
             if extraction_info and "processes" not in extraction_info:
                 extraction_info = None
 
-            code_reuse = self.client.get_sub_analysis_code_reuse_by_id(
-                analysis_id, sub_analysis_id
-            )
+            code_reuse = self.client.get_sub_analysis_code_reuse_by_id(analysis_id, sub_analysis_id)
 
             if code_reuse:
                 families = code_reuse.pop("families", [])
@@ -952,23 +923,18 @@ class Intezer(ServiceBase):
 
             if extraction_method != "root":
                 sub_kv_section = ResultKeyValueSection(
-                    f"Subanalysis report for {sub['sha256']}, extracted via {extraction_method}")
+                    f"Subanalysis report for {sub['sha256']}, extracted via {extraction_method}"
+                )
             else:
                 sub_kv_section = ResultKeyValueSection(f"Subanalysis report for {sub['sha256']}")
 
-            metadata = self.client.get_sub_analysis_metadata_by_id(
-                analysis_id, sub_analysis_id
-            )
-            processed_subanalysis = self._process_details(
-                metadata.copy(), UNINTERESTING_SUBANALYSIS_KEYS
-            )
+            metadata = self.client.get_sub_analysis_metadata_by_id(analysis_id, sub_analysis_id)
+            processed_subanalysis = self._process_details(metadata.copy(), UNINTERESTING_SUBANALYSIS_KEYS)
             sub_kv_section.update_items(processed_subanalysis)
             parent_section.add_subsection(sub_kv_section)
 
             if code_reuse:
-                code_reuse_kv_section = ResultKeyValueSection(
-                    "Code reuse detected"
-                )
+                code_reuse_kv_section = ResultKeyValueSection("Code reuse detected")
                 code_reuse_kv_section.update_items(code_reuse)
                 sub_kv_section.add_subsection(code_reuse_kv_section)
 
@@ -981,15 +947,11 @@ class Intezer(ServiceBase):
 
             # Setting a heuristic here or downloading the file would be redundant if the hash matched the original file
             if sub_sha256 != sha256:
-                self._set_heuristic_by_verdict(
-                    sub_kv_section, file_verdict_map.get(sub_sha256)
-                )
+                self._set_heuristic_by_verdict(sub_kv_section, file_verdict_map.get(sub_sha256))
 
                 if self.config.get("download_subfiles", True):
                     if can_we_download_files or self.config.get("try_to_download_every_file", False):
-                        file_was_downloaded = self.client.download_file_by_sha256(
-                            sub_sha256, self.working_directory
-                        )
+                        file_was_downloaded = self.client.download_file_by_sha256(sub_sha256, self.working_directory)
                         if file_was_downloaded:
                             path = f"{self.working_directory}/{sub_sha256}.sample"
                             try:
@@ -1014,9 +976,12 @@ class Intezer(ServiceBase):
             parent_section.add_subsection(process_tree_section)
 
     def _process_families(
-            self, families: List[Dict[str, str]],
-            sub_sha256: str, file_verdict_map: Dict[str, str],
-            parent_section: ResultSection) -> None:
+        self,
+        families: List[Dict[str, str]],
+        sub_sha256: str,
+        file_verdict_map: Dict[str, str],
+        parent_section: ResultSection,
+    ) -> None:
         """
         This method handles the "families" list, cutting out boring details and assigning verdicts
         :param families: A list of details for families
@@ -1029,9 +994,7 @@ class Intezer(ServiceBase):
         family_section = ResultTableSection("Family Details")
         family_section.set_column_order(["family_name", "family_type", "reused_code_count"])
         for family in families:
-            processed_family = self._process_details(
-                family.copy(), UNINTERESTING_FAMILY_KEYS
-            )
+            processed_family = self._process_details(family.copy(), UNINTERESTING_FAMILY_KEYS)
             family_section.add_row(TableRow(**processed_family))
             family_type = family["family_type"]
             family_name = family["family_name"]
@@ -1062,17 +1025,26 @@ class Intezer(ServiceBase):
                     family_section.heuristic.add_signature_id("50_or_more")
 
             # Only overwrite value if value is not already malicious
-            elif family_type in FAMILY_TYPES_OF_INTEREST and family_name not in SAFE_FAMILIES[family_type] and (sub_sha256 not in file_verdict_map or file_verdict_map[sub_sha256] not in Verdicts.MALICIOUS_VERDICTS.value):
+            elif (
+                family_type in FAMILY_TYPES_OF_INTEREST
+                and family_name not in SAFE_FAMILIES[family_type]
+                and (
+                    sub_sha256 not in file_verdict_map
+                    or file_verdict_map[sub_sha256] not in Verdicts.MALICIOUS_VERDICTS.value
+                )
+            ):
                 file_verdict_map[sub_sha256] = Verdicts.FAMILY_TYPE_OF_INTEREST.value
 
         if family_section.body:
             parent_section.add_subsection(family_section)
 
     def _process_extraction_info(
-            self, processes: List[Dict[str, Any]],
-            process_path_set: Set[str],
-            command_line_set: Set[str],
-            so: OntologyResults) -> None:
+        self,
+        processes: List[Dict[str, Any]],
+        process_path_set: Set[str],
+        command_line_set: Set[str],
+        so: OntologyResults,
+    ) -> None:
         """
         This method handles the processing of the extraction info process details
         :param processes: A list of processes
@@ -1108,12 +1080,14 @@ class Intezer(ServiceBase):
                     image=item["process_path"],
                     ppid=item["parent_process_id"],
                     objectid=OntologyResults.create_objectid(
-                        tag=Process.create_objectid_tag(item["process_path"],),
+                        tag=Process.create_objectid_tag(
+                            item["process_path"],
+                        ),
                         ontology_id=p_oid,
-                        service_name="IntezerStatic"
+                        service_name="IntezerStatic",
                     ),
                     command_line=command_line,
-                    start_time=MIN_TIME
+                    start_time=MIN_TIME,
                 )
                 so.add_process(p)
             process_path_set.add(item["process_path"])
