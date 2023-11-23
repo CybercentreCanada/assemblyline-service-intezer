@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from http import HTTPStatus
 from time import sleep, time
@@ -513,6 +514,8 @@ class Intezer(ServiceBase):
     def execute(self, request: ServiceRequest) -> None:
         sha256 = request.sha256
         result = Result()
+        # Updates are released to the Intezer cloud every day, therefore cache daily
+        request.set_service_context(f"Engine Update: {datetime.today().strftime('%Y-%m-%d')}")
 
         # First, let's get the analysis metadata, if it exists on the system
         main_api_result_from_retrieval = self._get_analysis_metadata(request.get_param("analysis_id"), sha256)
