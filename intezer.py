@@ -28,7 +28,7 @@ from assemblyline_v4_service.common.result import (
 from assemblyline_v4_service.common.task import MaxExtractedExceeded
 from intezer_sdk.api import IntezerApi
 from intezer_sdk.consts import API_VERSION, BASE_URL, AnalysisStatusCode, OnPremiseVersion
-from intezer_sdk.errors import ServerError, UnsupportedOnPremiseVersion
+from intezer_sdk.errors import InsufficientQuotaError, ServerError, UnsupportedOnPremiseVersion
 from requests import ConnectionError, HTTPError
 from safe_families import SAFE_FAMILIES
 from signatures import GENERIC_HEURISTIC_ID, get_attack_ids_for_signature_name, get_heur_id_for_signature_name
@@ -444,6 +444,9 @@ class ALIntezerApi(IntezerApi):
                 ) or HTTPStatus.REQUEST_ENTITY_TOO_LARGE.name in repr(e):
                     self.log.debug(f"Unable to analyze file for SHA256 {sha256} due to '{e}'.")
                     return Verdicts.FILE_TYPE_NOT_SUPPORTED.value
+                # You've hit your quota! Hopefully you're monitoring service logs because Intezer is about to crash a lot!
+                elif isinstance(e, InsufficientQuotaError):
+                    raise
                 else:
                     if not logged:
                         self.log.error(
