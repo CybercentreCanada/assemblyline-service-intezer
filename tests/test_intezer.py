@@ -22,7 +22,7 @@ from assemblyline_v4_service.common.result import (
 from assemblyline_v4_service.common.task import Task
 from intezer import CANNOT_EXTRACT_ARCHIVE, ALIntezerApi, Intezer
 from intezer_sdk.api import IntezerApi
-from intezer_sdk.errors import ServerError, UnsupportedOnPremiseVersion
+from intezer_sdk.errors import InsufficientQuotaError, ServerError, UnsupportedOnPremiseVersion
 from requests import ConnectionError, HTTPError
 
 # Getting absolute paths, names and regexes
@@ -1207,6 +1207,14 @@ class TestALIntezerApi:
                 dummy_al_intezer_api_instance.analyze_by_file(sha256, file_path, file_name, verify_file_support)
                 == "file_type_not_supported"
             )
+
+            # Case 8: "Good" ServerError
+            m.post(
+                f"{dummy_al_intezer_api_instance.full_url}/analyze",
+                exc=InsufficientQuotaError(dummy_get_response_class("blah")),
+            )
+            with pytest.raises(InsufficientQuotaError):
+                dummy_al_intezer_api_instance.analyze_by_file(sha256, file_path, file_name, verify_file_support)
 
     @staticmethod
     def test_get_file_analysis_response(dummy_al_intezer_api_instance, dummy_get_response_class):
