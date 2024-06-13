@@ -32,6 +32,7 @@ config:
   download_subfiles: true
   min_malware_genes: 5
   score_administration_tools: true
+  use_black_box_verdicts: true
 
 submission_params:
   - default: true
