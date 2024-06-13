@@ -128,6 +128,12 @@ class Verdicts(Enum):
     NEUTRAL = "neutral"
     NEUTRAL_VERDICTS = [NEUTRAL]
 
+    # Testing
+    # A verdict that is only used within the service code and never reported. This sample was given the verdict of
+    # "malicious" according to Intezer's proprietary algorithm for rendering verdicts.
+    TESTING = "testing"
+    TESTING_VERDICTS = [TESTING]
+
     INTERESTING_VERDICTS = MALICIOUS_VERDICTS + SUSPICIOUS_VERDICTS + FAMILY_TYPE_OF_INTEREST_VERDICTS
     UNINTERESTING_VERDICTS = NEUTRAL_VERDICTS + NOT_SUPPORTED_VERDICTS + UNKNOWN_VERDICTS + TRUSTED_VERDICTS
 
@@ -547,6 +553,10 @@ class Intezer(ServiceBase):
         if not verdict:
             return
 
+        # Do we want to generate our own verdicts based our own gene metric?
+        if not self.config.get("use_black_box_verdicts", True) and verdict in Verdicts.MALICIOUS_VERDICTS.value:
+            verdict = Verdicts.TESTING.value
+
         analysis_id = main_api_result["analysis_id"]
 
         # Setup the main result section
@@ -570,7 +580,7 @@ class Intezer(ServiceBase):
         # Setting heuristic here to avoid FPs. An analysis should not require sub_analyses to get a heuristic
         # assigned. A caveat to this is that the parent analysis has an unknown verdict but the sub-analysis of the
         # same file hash yields a different verdict.
-        if verdict == "unknown" and file_verdict_map.get(sha256, "unknown") != "unknown":
+        if verdict in [Verdicts.UNKNOWN.value, Verdicts.TESTING.value] and file_verdict_map.get(sha256, Verdicts.UNKNOWN.value) not in [Verdicts.UNKNOWN.value, Verdicts.TESTING.value]:
             verdict = file_verdict_map[sha256]
         self._set_heuristic_by_verdict(main_kv_section, verdict)
 
@@ -756,7 +766,11 @@ class Intezer(ServiceBase):
 
         if file_iocs:
             for file in file_iocs:
-                file_verdict_map[file["sha256"]] = file["verdict"]
+                # Do we want to generate our own verdicts based our own gene metric?
+                if not self.config.get("use_black_box_verdicts", True) and file["verdict"] in Verdicts.MALICIOUS_VERDICTS.value:
+                    file_verdict_map[file["sha256"]] = Verdicts.TESTING.value
+                else:
+                    file_verdict_map[file["sha256"]] = file["verdict"]
 
         if network_iocs:
             network_section = ResultTextSection("Network Communication Observed")
@@ -1036,7 +1050,7 @@ class Intezer(ServiceBase):
                 and family_name not in SAFE_FAMILIES[family_type]
                 and (
                     sub_sha256 not in file_verdict_map
-                    or file_verdict_map[sub_sha256] not in Verdicts.MALICIOUS_VERDICTS.value
+                    or file_verdict_map[sub_sha256] not in Verdicts.MALICIOUS_VERDICTS.value + [Verdicts.TESTING.value]
                 )
             ):
                 file_verdict_map[sub_sha256] = Verdicts.FAMILY_TYPE_OF_INTEREST.value
