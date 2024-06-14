@@ -554,7 +554,7 @@ class Intezer(ServiceBase):
             return
 
         # Do we want to generate our own verdicts based our own gene metric?
-        if not self.config.get("use_black_box_verdicts", True) and verdict in Verdicts.MALICIOUS_VERDICTS.value:
+        if not self.config.get("use_black_box_verdicts", True) and verdict in Verdicts.MALICIOUS_VERDICTS.value + Verdicts.SUSPICIOUS_VERDICTS.value:
             verdict = Verdicts.TESTING.value
 
         analysis_id = main_api_result["analysis_id"]
@@ -767,7 +767,7 @@ class Intezer(ServiceBase):
         if file_iocs:
             for file in file_iocs:
                 # Do we want to generate our own verdicts based our own gene metric?
-                if not self.config.get("use_black_box_verdicts", True) and file["verdict"] in Verdicts.MALICIOUS_VERDICTS.value:
+                if not self.config.get("use_black_box_verdicts", True) and file["verdict"] in Verdicts.MALICIOUS_VERDICTS.value + Verdicts.SUSPICIOUS_VERDICTS.value:
                     file_verdict_map[file["sha256"]] = Verdicts.TESTING.value
                 else:
                     file_verdict_map[file["sha256"]] = file["verdict"]
