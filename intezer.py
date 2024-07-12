@@ -498,6 +498,8 @@ class Intezer(ServiceBase):
         self.log.debug("Initializing the Intezer service...")
         self.client: Optional[ALIntezerApi] = None
         self.privileged = os.environ.get("PRIVILEGED", "false").lower()
+        if self.privileged == "true":
+            self.filestore = forge.get_filestore()
 
     def start(self) -> None:
         global global_safelist
@@ -982,15 +984,16 @@ class Intezer(ServiceBase):
                         if self.privileged == "true":
                             # Attempt to download from AL4 filestore first.
                             # This prevents un-necessary hit against user's quota with Intezer
-                            fs = forge.get_filestore()
-                            if fs.exists(sub_sha256):
-                                fs.download(sub_sha256, path)
+                            if self.filestore.exists(sub_sha256):
+                                self.filestore.download(sub_sha256, path)
                                 if os.path.exists(path):
+                                    self.log.debug(f"Downloaded file from filestore: {sub_sha256}")
                                     file_was_downloaded = True
 
                         # if file was not downloaded via the filestore, attempt to download from Intezer.
                         if not file_was_downloaded:
                             file_was_downloaded = self.client.download_file_by_sha256(sub_sha256, self.working_directory)
+                            self.log.debug(f"Downloaded file from Intezer: {sub_sha256}")
 
                         if file_was_downloaded:
                             try:
