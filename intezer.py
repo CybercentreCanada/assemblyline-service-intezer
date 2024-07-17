@@ -1,9 +1,12 @@
+import os
+
 from datetime import datetime
 from enum import Enum
 from http import HTTPStatus
 from time import sleep, time
 from typing import Any, Dict, List, Optional, Set
 
+from assemblyline.common import forge
 from assemblyline.common.exceptions import NonRecoverableError
 from assemblyline.common.str_utils import truncate
 from assemblyline.odm.models.ontology.results.process import Process as ProcessModel
@@ -494,6 +497,9 @@ class Intezer(ServiceBase):
         super().__init__(config)
         self.log.debug("Initializing the Intezer service...")
         self.client: Optional[ALIntezerApi] = None
+        self.privileged = os.environ.get("PRIVILEGED", "false").lower()
+        if self.privileged == "true":
+            self.filestore = forge.get_filestore()
 
     def start(self) -> None:
         global global_safelist
@@ -971,9 +977,25 @@ class Intezer(ServiceBase):
 
                 if self.config.get("download_subfiles", True):
                     if can_we_download_files or self.config.get("try_to_download_every_file", False):
-                        file_was_downloaded = self.client.download_file_by_sha256(sub_sha256, self.working_directory)
+
+                        file_was_downloaded = False
+                        path = f"{os.path.join(self.working_directory, sub_sha256)}.sample"
+
+                        if self.privileged == "true":
+                            # Attempt to download from AL4 filestore first.
+                            # This prevents un-necessary hit against user's quota with Intezer
+                            if self.filestore.exists(sub_sha256):
+                                self.filestore.download(sub_sha256, path)
+                                if os.path.exists(path):
+                                    self.log.debug(f"Downloaded file from filestore: {sub_sha256}")
+                                    file_was_downloaded = True
+
+                        # if file was not downloaded via the filestore, attempt to download from Intezer.
+                        if not file_was_downloaded:
+                            file_was_downloaded = self.client.download_file_by_sha256(sub_sha256, self.working_directory)
+                            self.log.debug(f"Downloaded file from Intezer: {sub_sha256}")
+
                         if file_was_downloaded:
-                            path = f"{self.working_directory}/{sub_sha256}.sample"
                             try:
                                 request.add_extracted(
                                     path,

@@ -111,4 +111,4 @@ docker_config:
   allow_internet_access: true
   image: ${REGISTRY}cccs/assemblyline-service-intezer:$SERVICE_TAG
   cpu_cores: 0.5
-  ram_mb: 256
+  ram_mb: 512
