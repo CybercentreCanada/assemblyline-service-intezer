@@ -1,2 +1,0 @@
-libfuzzy2
-libfuzzy-dev
