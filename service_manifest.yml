@@ -106,6 +106,41 @@ heuristics:
     score: 0
     filetype: .*
     description: Intezer has detected reused malware genes
+  - heur_id: 13
+    name: Intezer found a subverdict malicious
+    score: 1000
+    filetype: .*
+    description: Intezer has found this submission as malicious
+  - heur_id: 14
+    name: Intezer found a subverdict known malicious
+    score: 1000
+    filetype: .*
+    description: Intezer has found this submission as known malicious
+  - heur_id: 15
+    name: Intezer found a subverdict suspicious
+    score: 500
+    filetype: .*
+    description: Intezer has found this submission as suspicious
+  - heur_id: 16
+    name: Intezer found a subverdict unique
+    score: 50
+    filetype: .*
+    description: Intezer has found this submission as unique
+  - heur_id: 17
+    name: Intezer found a subverdict trusted
+    score: 0
+    filetype: .*
+    description: Intezer has found this submission as trusted
+  - heur_id: 18
+    name: Intezer found a subverdict administration_tool
+    score: 100
+    filetype: .*
+    description: Intezer has found this submission as administration_tool
+  - heur_id: 19
+    name: Intezer found a subverdict known_administration_tool
+    score: 100
+    filetype: .*
+    description: Intezer has found this submission as known_administration_tool
 
 docker_config:
   allow_internet_access: true
