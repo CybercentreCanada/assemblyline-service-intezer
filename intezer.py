@@ -44,6 +44,7 @@ UNINTERESTING_ANALYSIS_KEYS = [
     "sha256",
     "verdict",
     "family_id",
+    "sub_verdict"
 ]
 UNINTERESTING_SUBANALYSIS_KEYS = [
     "source",
@@ -53,6 +54,17 @@ UNINTERESTING_SUBANALYSIS_KEYS = [
     "sha256",
     "size_in_bytes",
     "ssdeep",
+]
+UNINTERESTING_SUBVERDICT_KEYS = [
+    "analysis_id",
+    "analysis_time",
+    "analysis_url",
+    "family_id",
+    "family_name",
+    "file_name",
+    "is_private",
+    "sha256",
+    "verdict",
 ]
 UNINTERESTING_FAMILY_KEYS = ["family_id"]
 
@@ -555,6 +567,7 @@ class Intezer(ServiceBase):
             main_api_result = main_api_result_from_retrieval
 
         verdict = main_api_result.get("verdict")
+        subverdict = main_api_result.get("sub_verdict")
         verdict = self._massage_verdict(request, result, main_api_result, verdict)
         if not verdict:
             return
@@ -569,6 +582,7 @@ class Intezer(ServiceBase):
         main_kv_section = ResultKeyValueSection("Intezer analysis report")
         processed_main_api_result = self._process_details(main_api_result.copy(), UNINTERESTING_ANALYSIS_KEYS)
         main_kv_section.update_items(processed_main_api_result)
+
         if "family_name" in main_api_result and main_api_result["family_name"] not in [GENERIC_MALWARE, NOT_APPLICABLE]:
             # Don't tag administration tool families
             if verdict != Verdicts.ADMINISTRATION_TOOL.value:
@@ -590,8 +604,15 @@ class Intezer(ServiceBase):
             verdict = file_verdict_map[sha256]
         self._set_heuristic_by_verdict(main_kv_section, verdict)
 
+        sub_verdict_kv_section = ResultKeyValueSection("Intezer sub-verdict")
+        processed_main_api_sub_verdict_result = self._process_details(main_api_result.copy(), UNINTERESTING_SUBVERDICT_KEYS)
+        sub_verdict_kv_section.update_items(processed_main_api_sub_verdict_result)
+        self._set_heuristic_by_sub_verdict(sub_verdict_kv_section, subverdict)
+
         if main_kv_section.subsections or main_kv_section.heuristic:
             result.add_section(main_kv_section)
+        if sub_verdict_kv_section.subsections or sub_verdict_kv_section.heuristic:
+            result.add_section(sub_verdict_kv_section)
         request.result = result
 
     def _get_analysis_metadata(self, analysis_id: str, sha256: str) -> Dict[str, str]:
@@ -750,6 +771,31 @@ class Intezer(ServiceBase):
             result_section.set_heuristic(2)
         elif verdict in Verdicts.FAMILY_TYPE_OF_INTEREST_VERDICTS.value:
             result_section.set_heuristic(3)
+
+    def _set_heuristic_by_sub_verdict(self, result_section: ResultSection, subverdict: Optional[str]) -> None:
+        """
+        This method sets the heuristic of the result section based on the verdict
+        :param result_section: The result section that will have its heuristic set
+        :param verdict: The verdict of the file
+        :return: None
+        """
+        if not subverdict:
+            return
+
+        if subverdict in Verdicts.MALICIOUS.value:
+            result_section.set_heuristic(13)
+        elif subverdict in Verdicts.KNOWN_MALICIOUS.value:
+            result_section.set_heuristic(14)
+        elif subverdict in Verdicts.SUSPICIOUS.value:
+            result_section.set_heuristic(15)
+        elif subverdict in Verdicts.UNIQUE.value:
+            result_section.set_heuristic(16)
+        elif subverdict in Verdicts.TRUSTED.value:
+            result_section.set_heuristic(17)
+        elif subverdict in Verdicts.ADMINISTRATION_TOOL.value:
+            result_section.set_heuristic(18)
+        elif subverdict in Verdicts.KNOWN_ADMINISTRATION_TOOL.value:
+            result_section.set_heuristic(19)
 
     def _process_iocs(
         self,
@@ -1034,9 +1080,13 @@ class Intezer(ServiceBase):
         :return: None
         """
         family_section = ResultTableSection("Family Details")
-        family_section.set_column_order(["family_name", "family_type", "reused_code_count"])
+        family_section.set_column_order(["family_name", "family_type", "reused_code_count", "gene_percentage"])
+        total_genes = 0
+        for family in families:
+            total_genes += family["reused_gene_count"]
         for family in families:
             processed_family = self._process_details(family.copy(), UNINTERESTING_FAMILY_KEYS)
+            processed_family["gene_percentage"] = str(round((family["reused_gene_count"] / total_genes) * 100, 2)) + "%"
             family_section.add_row(TableRow(**processed_family))
             family_type = family["family_type"]
             family_name = family["family_name"]
