@@ -31,5 +31,6 @@ extends:
   parameters:
     is_public: "true"
     samples_repo: unittest-samples
+    short_description: "This Assemblyline service queries/submits files to Intezer for analysis"
     labels:
       classification: "UNCLASSIFIED"
