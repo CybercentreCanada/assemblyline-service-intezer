@@ -141,7 +141,11 @@ heuristics:
     score: 100
     filetype: .*
     description: Intezer has found this submission as known_administration_tool
-
+  - heur_id: 20
+    name: Intezer returned a result
+    score: 0
+    filetype: .*
+    description: Results from Intezer analysis
 docker_config:
   allow_internet_access: true
   image: ${REGISTRY}cccs/assemblyline-service-intezer:$SERVICE_TAG
