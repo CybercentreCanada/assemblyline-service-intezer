@@ -544,8 +544,9 @@ class TestIntezer:
 
         mocker.patch.object(intezer_class_instance.client, "get_sub_analyses_by_id", return_value=[])
         parent_result_section = ResultSection("blah")
+        intezer_result_section = ResultSection("blah")
         intezer_class_instance._handle_subanalyses(
-            dummy_request_class_instance, "blah", "blah", {}, parent_result_section
+            dummy_request_class_instance, "blah", "blah", {}, parent_result_section, intezer_result_section
         )
         assert parent_result_section.subsections == []
 
@@ -592,7 +593,7 @@ class TestIntezer:
         correct_process_tree.add_tag("dynamic.processtree_id", "blah2.exe")
         correct_process_tree.add_tag("dynamic.process.file_name", "blah2.exe")
         intezer_class_instance._handle_subanalyses(
-            dummy_request_class_instance, "blah", "blah", {}, parent_result_section
+            dummy_request_class_instance, "blah", "blah", {}, parent_result_section, intezer_result_section
         )
         assert check_section_equality(parent_result_section.subsections[0], correct_result_section)
         assert check_section_equality(parent_result_section.subsections[1], correct_process_tree)
@@ -641,7 +642,7 @@ class TestIntezer:
     )
     def test_process_families(families, file_verdict_map, correct_fvp, intezer_class_instance):
         parent_section = ResultSection("blah")
-        intezer_class_instance._process_families(families, "blah", file_verdict_map, parent_section)
+        intezer_class_instance._process_families(families, "blah", file_verdict_map, parent_section, 66)
 
         if not families:
             assert parent_section.subsections == []
