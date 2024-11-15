@@ -544,6 +544,7 @@ class TestIntezer:
 
         mocker.patch.object(intezer_class_instance.client, "get_sub_analyses_by_id", return_value=[])
         parent_result_section = ResultSection("blah")
+        parent_result_section.add_line('gene_count: 971')
         intezer_result_section = ResultKeyValueSection("blah")
         intezer_class_instance._handle_subanalyses(
             dummy_request_class_instance, "blah", "blah", {}, parent_result_section, intezer_result_section
