@@ -1030,9 +1030,10 @@ class Intezer(ServiceBase):
                 sub_kv_section.add_subsection(code_reuse_kv_section)
                 processed_code_reuse = self._process_details(code_reuse.copy(), RELEVANT_DETAILS)
                 intezer_result.update_items(processed_code_reuse)
+                total_genes = code_reuse["gene_count"]
 
             sub_sha256 = sub["sha256"]
-            total_genes = code_reuse["gene_count"]
+            
             if families:
                 self._process_families(families, sub_sha256, file_verdict_map, sub_kv_section, total_genes)
 
