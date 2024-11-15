@@ -544,7 +544,7 @@ class TestIntezer:
 
         mocker.patch.object(intezer_class_instance.client, "get_sub_analyses_by_id", return_value=[])
         parent_result_section = ResultSection("blah")
-        intezer_result_section = ResultSection("blah")
+        intezer_result_section = ResultKeyValueSection("blah")
         intezer_class_instance._handle_subanalyses(
             dummy_request_class_instance, "blah", "blah", {}, parent_result_section, intezer_result_section
         )
@@ -605,20 +605,20 @@ class TestIntezer:
         "families, file_verdict_map, correct_fvp",
         [
             ([], {}, {}),
-            ([{"blah": "blah", "family_type": "blah", "family_name": "blah", "reused_gene_count": 4, "gene_percentage": "100.0%"}], {}, {}),
-            ([{"family_id": "blah", "family_type": "blah", "family_name": "blah", "reused_gene_count": 4, "gene_percentage": "100.0%"}], {}, {}),
+            ([{"blah": "blah", "family_type": "blah", "family_name": "blah", "reused_gene_count": 4, "gene_percentage": "6.06%"}], {}, {}),
+            ([{"family_id": "blah", "family_type": "blah", "family_name": "blah", "reused_gene_count": 4, "gene_percentage": "6.06%"}], {}, {}),
             (
-                [{"family_id": "blah", "family_type": "application", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "100.0%"}],
+                [{"family_id": "blah", "family_type": "application", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
                 {},
                 {},
             ),
             (
-                [{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "100.0%"}],
+                [{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
                 {},
                 {"blah": "malicious"},
             ),
             (
-                [{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "100.0%"}],
+                [{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
                 {"blah": "blah"},
                 {"blah": "malicious"},
             ),
@@ -628,16 +628,16 @@ class TestIntezer:
                 {"blah": "malicious"},
             ),
             (
-                [{"family_id": "blah", "family_type": "packer", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "100.0%"}],
+                [{"family_id": "blah", "family_type": "packer", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
                 {},
                 {"blah": "interesting"},
             ),
             (
-                [{"family_id": "blah", "family_type": "packer", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "100.0%"}],
+                [{"family_id": "blah", "family_type": "packer", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
                 {"blah": "malicious"},
                 {"blah": "malicious"},
             ),
-            ([{"family_id": "blah", "family_type": "packer", "family_name": "UPX", "reused_gene_count": 6, "gene_percentage": "100.0%"}], {}, {}),
+            ([{"family_id": "blah", "family_type": "packer", "family_name": "UPX", "reused_gene_count": 6, "gene_percentage": "9.09%"}], {}, {}),
         ],
     )
     def test_process_families(families, file_verdict_map, correct_fvp, intezer_class_instance):
