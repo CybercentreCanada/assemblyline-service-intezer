@@ -544,7 +544,6 @@ class TestIntezer:
 
         mocker.patch.object(intezer_class_instance.client, "get_sub_analyses_by_id", return_value=[])
         parent_result_section = ResultSection("blah")
-        parent_result_section.add_line('gene_count: 971')
         intezer_result_section = ResultKeyValueSection("blah")
         intezer_class_instance._handle_subanalyses(
             dummy_request_class_instance, "blah", "blah", {}, parent_result_section, intezer_result_section
@@ -575,7 +574,7 @@ class TestIntezer:
         mocker.patch.object(
             intezer_class_instance.client,
             "get_sub_analysis_code_reuse_by_id",
-            return_value={"families": [{"reused_gene_count": 2}], "blah": "blah"},
+            return_value={"families": [{"reused_gene_count": 2}], "blah": "blah", "gene_count": "66"},
         )
         mocker.patch.object(
             intezer_class_instance.client,
@@ -588,6 +587,7 @@ class TestIntezer:
         correct_result_section.update_items({"blah": "blah"})
         correct_code_reuse = ResultKeyValueSection("Code reuse detected")
         correct_code_reuse.update_items({"blah": "blah"})
+        correct_code_reuse.update_items({"gene_count": "66"})
         correct_result_section.add_subsection(correct_code_reuse)
         correct_process_tree = ResultProcessTreeSection("Spawned Process Tree")
         correct_process_tree.add_process(ProcessItem(pid=124, name="blah2.exe", cmd=None))
@@ -615,12 +615,12 @@ class TestIntezer:
             ),
             (
                 [{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
-                {},
+                {"blah": "malicious"},
                 {"blah": "malicious"},
             ),
             (
                 [{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
-                {"blah": "blah"},
+                {"blah": "malicious"},
                 {"blah": "malicious"},
             ),
             (
