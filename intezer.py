@@ -66,6 +66,17 @@ UNINTERESTING_SUBVERDICT_KEYS = [
     "sha256",
     "verdict",
 ]
+RELEVANT_DETAILS = [
+    "analysis_time",
+    "analysis_url",
+    "file_name",
+    "is_private",
+    "sha256",
+    "sha1",
+    "md5",
+    "size_in_bytes",
+    "ssdeep",
+]
 UNINTERESTING_FAMILY_KEYS = ["family_id"]
 
 FAMILIES_TO_NOT_TAG = ["application", "library"]
@@ -580,6 +591,10 @@ class Intezer(ServiceBase):
 
         # Setup the main result section
         main_kv_section = ResultKeyValueSection("Intezer analysis report")
+        intezer_result_kv_section = ResultKeyValueSection("Intezer Results")
+        processed_intezer_result = self._process_details(main_api_result.copy(), RELEVANT_DETAILS)
+        intezer_result_kv_section.update_items(processed_intezer_result)
+        intezer_result_kv_section.set_heuristic(20)
         processed_main_api_result = self._process_details(main_api_result.copy(), UNINTERESTING_ANALYSIS_KEYS)
         main_kv_section.update_items(processed_main_api_result)
 
@@ -595,7 +610,7 @@ class Intezer(ServiceBase):
         self._process_iocs(analysis_id, file_verdict_map, main_kv_section)
         if not self.config["is_on_premise"]:
             self._process_ttps(analysis_id, main_kv_section)
-        self._handle_subanalyses(request, sha256, analysis_id, file_verdict_map, main_kv_section)
+        self._handle_subanalyses(request, sha256, analysis_id, file_verdict_map, main_kv_section, intezer_result_kv_section)
 
         # Setting heuristic here to avoid FPs. An analysis should not require sub_analyses to get a heuristic
         # assigned. A caveat to this is that the parent analysis has an unknown verdict but the sub-analysis of the
@@ -609,6 +624,7 @@ class Intezer(ServiceBase):
         sub_verdict_kv_section.update_items(processed_main_api_sub_verdict_result)
         self._set_heuristic_by_sub_verdict(sub_verdict_kv_section, subverdict)
 
+        result.add_section(intezer_result_kv_section)
         if main_kv_section.subsections or main_kv_section.heuristic:
             result.add_section(main_kv_section)
         if sub_verdict_kv_section.subsections or sub_verdict_kv_section.heuristic:
@@ -938,6 +954,7 @@ class Intezer(ServiceBase):
         analysis_id: str,
         file_verdict_map: Dict[str, str],
         parent_section: ResultSection,
+        intezer_result: ResultKeyValueSection,
     ) -> None:
         """
         This method handles the subanalyses for a given analysis ID
@@ -1004,15 +1021,21 @@ class Intezer(ServiceBase):
             processed_subanalysis = self._process_details(metadata.copy(), UNINTERESTING_SUBANALYSIS_KEYS)
             sub_kv_section.update_items(processed_subanalysis)
             parent_section.add_subsection(sub_kv_section)
+            processed_subanalysis = self._process_details(metadata.copy(), RELEVANT_DETAILS)
+            intezer_result.update_items(processed_subanalysis)
 
             if code_reuse:
                 code_reuse_kv_section = ResultKeyValueSection("Code reuse detected")
                 code_reuse_kv_section.update_items(code_reuse)
                 sub_kv_section.add_subsection(code_reuse_kv_section)
+                processed_code_reuse = self._process_details(code_reuse.copy(), RELEVANT_DETAILS)
+                intezer_result.update_items(processed_code_reuse)
+                total_genes = code_reuse["gene_count"]
 
             sub_sha256 = sub["sha256"]
+            
             if families:
-                self._process_families(families, sub_sha256, file_verdict_map, sub_kv_section)
+                self._process_families(families, sub_sha256, file_verdict_map, sub_kv_section, total_genes)
 
             if extraction_info:
                 self._process_extraction_info(extraction_info["processes"], process_path_set, command_line_set, so)
@@ -1069,6 +1092,7 @@ class Intezer(ServiceBase):
         sub_sha256: str,
         file_verdict_map: Dict[str, str],
         parent_section: ResultSection,
+        total_genes: int,
     ) -> None:
         """
         This method handles the "families" list, cutting out boring details and assigning verdicts
@@ -1081,9 +1105,6 @@ class Intezer(ServiceBase):
         """
         family_section = ResultTableSection("Family Details")
         family_section.set_column_order(["family_name", "family_type", "reused_code_count", "gene_percentage"])
-        total_genes = 0
-        for family in families:
-            total_genes += family["reused_gene_count"]
         for family in families:
             processed_family = self._process_details(family.copy(), UNINTERESTING_FAMILY_KEYS)
             processed_family["gene_percentage"] = str(round((family["reused_gene_count"] / total_genes) * 100, 2)) + "%"

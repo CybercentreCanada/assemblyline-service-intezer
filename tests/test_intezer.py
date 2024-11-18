@@ -544,8 +544,9 @@ class TestIntezer:
 
         mocker.patch.object(intezer_class_instance.client, "get_sub_analyses_by_id", return_value=[])
         parent_result_section = ResultSection("blah")
+        intezer_result_section = ResultKeyValueSection("blah")
         intezer_class_instance._handle_subanalyses(
-            dummy_request_class_instance, "blah", "blah", {}, parent_result_section
+            dummy_request_class_instance, "blah", "blah", {}, parent_result_section, intezer_result_section
         )
         assert parent_result_section.subsections == []
 
@@ -573,7 +574,7 @@ class TestIntezer:
         mocker.patch.object(
             intezer_class_instance.client,
             "get_sub_analysis_code_reuse_by_id",
-            return_value={"families": [{"reused_gene_count": 2}], "blah": "blah"},
+            return_value={"families": [{"reused_gene_count": 2}], "blah": "blah", "gene_count": "66"},
         )
         mocker.patch.object(
             intezer_class_instance.client,
@@ -586,13 +587,14 @@ class TestIntezer:
         correct_result_section.update_items({"blah": "blah"})
         correct_code_reuse = ResultKeyValueSection("Code reuse detected")
         correct_code_reuse.update_items({"blah": "blah"})
+        correct_code_reuse.update_items({"gene_count": "66"})
         correct_result_section.add_subsection(correct_code_reuse)
         correct_process_tree = ResultProcessTreeSection("Spawned Process Tree")
         correct_process_tree.add_process(ProcessItem(pid=124, name="blah2.exe", cmd=None))
         correct_process_tree.add_tag("dynamic.processtree_id", "blah2.exe")
         correct_process_tree.add_tag("dynamic.process.file_name", "blah2.exe")
         intezer_class_instance._handle_subanalyses(
-            dummy_request_class_instance, "blah", "blah", {}, parent_result_section
+            dummy_request_class_instance, "blah", "blah", {}, parent_result_section, intezer_result_section
         )
         assert check_section_equality(parent_result_section.subsections[0], correct_result_section)
         assert check_section_equality(parent_result_section.subsections[1], correct_process_tree)
@@ -604,21 +606,21 @@ class TestIntezer:
         "families, file_verdict_map, correct_fvp",
         [
             ([], {}, {}),
-            ([{"blah": "blah", "family_type": "blah", "family_name": "blah", "reused_gene_count": 4, "gene_percentage": "100.0%"}], {}, {}),
-            ([{"family_id": "blah", "family_type": "blah", "family_name": "blah", "reused_gene_count": 4, "gene_percentage": "100.0%"}], {}, {}),
+            ([{"blah": "blah", "family_type": "blah", "family_name": "blah", "reused_gene_count": 4, "gene_percentage": "6.06%"}], {}, {}),
+            ([{"family_id": "blah", "family_type": "blah", "family_name": "blah", "reused_gene_count": 4, "gene_percentage": "6.06%"}], {}, {}),
             (
-                [{"family_id": "blah", "family_type": "application", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "100.0%"}],
+                [{"family_id": "blah", "family_type": "application", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
                 {},
                 {},
             ),
             (
-                [{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "100.0%"}],
-                {},
+                [{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
+                {"blah": "malicious"},
                 {"blah": "malicious"},
             ),
             (
-                [{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "100.0%"}],
-                {"blah": "blah"},
+                [{"family_id": "blah", "family_type": "malware", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
+                {"blah": "malicious"},
                 {"blah": "malicious"},
             ),
             (
@@ -627,21 +629,21 @@ class TestIntezer:
                 {"blah": "malicious"},
             ),
             (
-                [{"family_id": "blah", "family_type": "packer", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "100.0%"}],
+                [{"family_id": "blah", "family_type": "packer", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
                 {},
                 {"blah": "interesting"},
             ),
             (
-                [{"family_id": "blah", "family_type": "packer", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "100.0%"}],
+                [{"family_id": "blah", "family_type": "packer", "family_name": "blah", "reused_gene_count": 6, "gene_percentage": "9.09%"}],
                 {"blah": "malicious"},
                 {"blah": "malicious"},
             ),
-            ([{"family_id": "blah", "family_type": "packer", "family_name": "UPX", "reused_gene_count": 6, "gene_percentage": "100.0%"}], {}, {}),
+            ([{"family_id": "blah", "family_type": "packer", "family_name": "UPX", "reused_gene_count": 6, "gene_percentage": "9.09%"}], {}, {}),
         ],
     )
     def test_process_families(families, file_verdict_map, correct_fvp, intezer_class_instance):
         parent_section = ResultSection("blah")
-        intezer_class_instance._process_families(families, "blah", file_verdict_map, parent_section)
+        intezer_class_instance._process_families(families, "blah", file_verdict_map, parent_section, 66)
 
         if not families:
             assert parent_section.subsections == []
@@ -704,6 +706,8 @@ class TestIntezer:
                 "image": "blah.exe",
                 "command_line": "blah.exe blah.dll,blah",
                 "integrity_level": None,
+                'services_involved': None,
+                'loaded_modules': None,
                 "image_hash": None,
                 "original_file_name": None,
             },
@@ -736,6 +740,8 @@ class TestIntezer:
                 "image": "blah2.exe",
                 "command_line": "blah2.exe blah2.dll,blah",
                 "integrity_level": None,
+                'services_involved': None,
+                'loaded_modules': None,
                 "image_hash": None,
                 "original_file_name": None,
             },
@@ -759,6 +765,8 @@ class TestIntezer:
                 "pid": 321,
                 "image": "blah3.exe",
                 "command_line": None,
+                'services_involved': None,
+                'loaded_modules': None,
                 "integrity_level": None,
                 "image_hash": None,
                 "original_file_name": None,
