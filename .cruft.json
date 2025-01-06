@@ -1,6 +1,6 @@
 {
   "template": "https://github.com/CybercentreCanada/assemblyline-service-template.git",
-  "commit": "6a32666117e30dbfb990bfaf6e7c9eb25badd03a",
+  "commit": "99becf8ed2990a4063a5bb1f8ce878824a5a1a7b",
   "checkout": null,
   "context": {
     "cookiecutter": {
@@ -8,15 +8,15 @@
       "__svc_name": "intezer",
       "__repository": "assemblyline-service-intezer",
       "__pkg_name": "intezer",
+      "class_name": "Intezer",
       "short_description": "This service fetches results from Intezer based on the submitted file's SHA256 hash.",
-      "short_description_fr": "Ce service r\u00e9cup\u00e8re les r\u00e9sultats d'Intezer sur la base du hachage SHA256 du fichier soumis.",
+      "short_description_fr": "Ce service récupère les résultats d'Intezer sur la base du hachage SHA256 du fichier soumis.",
       "stage": "CORE",
       "category": "External",
       "org_name_full": "CybercentreCanada",
       "org_name_short": "cccs",
       "license": "mit",
-      "_template": "https://github.com/CybercentreCanada/assemblyline-service-template.git",
-      "class_name": "Intezer"
+      "_template": "https://github.com/CybercentreCanada/assemblyline-service-template.git"
     }
   },
   "directory": null
