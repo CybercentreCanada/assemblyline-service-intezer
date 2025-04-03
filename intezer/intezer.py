@@ -1,9 +1,11 @@
+import json
 import os
 
 from datetime import datetime
 from enum import Enum
 from http import HTTPStatus
 from time import sleep, time
+from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Set
 
 from assemblyline.common import forge
@@ -576,6 +578,13 @@ class Intezer(ServiceBase):
         else:
             self.log.debug(f"{sha256} was found on the system.")
             main_api_result = main_api_result_from_retrieval
+
+        # Save original report from Intezer as a supplementary file
+        with NamedTemporaryFile("w", delete=False) as report_file:
+            json.dump(main_api_result, report_file, indent=2)
+
+        request.add_supplementary(report_file.name, "Intezer report", "Report from Intezer")
+
 
         verdict = main_api_result.get("verdict")
         subverdict = main_api_result.get("sub_verdict")
