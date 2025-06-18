@@ -151,6 +151,11 @@ heuristics:
     score: 0
     filetype: .*
     description: Results from Intezer analysis
+  - heur_id: 21
+    name: Intezer found malicious strings
+    score: 0
+    filetype: .*
+    description: Results from Intezer string analysis
 docker_config:
   allow_internet_access: true
   image: ${REGISTRY}cccs/assemblyline-service-intezer:$SERVICE_TAG
