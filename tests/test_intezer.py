@@ -578,6 +578,37 @@ class TestIntezer:
         )
         mocker.patch.object(
             intezer_class_instance.client,
+            "get_sub_analysis_strings_by_id",
+            return_value=
+            {
+                "result": {
+                    "strings": [
+                        {
+                            "software_type": "blah",
+                            "string_value": "bloop.exe",
+                            "tags": [
+                                "blahblah"
+                            ]
+                        },
+                        {
+                            "families": [
+                                {
+                                    "family_id": "abc-123-def-456",
+                                    "family_name": "blargh"
+                                }
+                            ],
+                            "software_type": "blurb",
+                            "string_value": "123.456.123",
+                            "tags": [
+                                "blahblahblah"
+                            ]
+                        }
+                    ]
+                }
+            }
+        )
+        mocker.patch.object(
+            intezer_class_instance.client,
             "get_sub_analysis_metadata_by_id",
             return_value={"source": "blah", "blah": "blah"},
         )
@@ -588,6 +619,40 @@ class TestIntezer:
         correct_code_reuse = ResultKeyValueSection("Code reuse detected")
         correct_code_reuse.update_items({"blah": "blah"})
         correct_code_reuse.update_items({"gene_count": "66"})
+        correct_strings = ResultTableSection("Total String Count per Family")
+        correct_strings.set_column_order(["Family Name", "String Count"])
+        row = {
+                "Family Name": "blah",
+                "String Count": 1
+            }
+        correct_strings.add_row(TableRow(row))
+        row = {
+                "Family Name": "blargh",
+                "String Count": 1
+            }
+        correct_strings.add_row(TableRow(row))
+        correct_string_family1 = ResultTableSection("String Family: blah", auto_collapse=True)
+        correct_string_family1.set_column_order(["String Value", "Families", "Tags"])
+        row = {
+                "String Value": "bloop.exe",
+                "Families": "blah",
+                "Tags": "blahblah"
+            }
+        correct_string_family1.add_row(TableRow(row))
+        correct_string_family1.set_heuristic(21)
+        correct_strings.add_subsection(correct_string_family1)
+        correct_string_family2 = ResultTableSection("String Family: blurb", auto_collapse=True)
+        correct_string_family2.set_column_order(["String Value", "Families", "Tags"])
+        row = {
+                "String Value": "123.456.123",
+                "Families": "blargh",
+                "Tags": "blahblahblah"
+            }
+        correct_string_family2.add_row(TableRow(row))
+        correct_string_family2.set_heuristic(21)
+        correct_strings.add_subsection(correct_string_family2)
+        correct_strings.set_heuristic(21)
+        correct_result_section.add_subsection(correct_strings)
         correct_result_section.add_subsection(correct_code_reuse)
         correct_process_tree = ResultProcessTreeSection("Spawned Process Tree")
         correct_process_tree.add_process(ProcessItem(pid=124, name="blah2.exe", cmd=None))
