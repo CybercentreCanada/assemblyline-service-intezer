@@ -836,7 +836,7 @@ class Intezer(ServiceBase):
         sorted_families = list(sorted_families)
         sorted_family_count = list(sorted_family_count)
 
-        string_family_table = ResultTableSection("String Family Count")
+        string_family_table = ResultTableSection("Total String Count per Family")
         string_family_table.set_column_order(["Family Name", "String Count"])
 
         for i in range(len(families)):
