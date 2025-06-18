@@ -358,6 +358,36 @@ class ALIntezerApi(IntezerApi):
                 self.log.debug(f"Unable to get sub_analyses code re-use for analysis ID {analysis_id} due to '{e}'.")
                 return None
 
+    def get_sub_analysis_strings_by_id(self, analysis_id: str, sub_analysis_id: str) -> Optional[Dict[str, Any]]:
+        # We will try to connect with the REST API... NO MATTER WHAT
+        logged = False
+        while True:
+            try:
+                results = IntezerApi.request_with_refresh_expired_access_token(
+                    self=self,
+                    method="GET",
+                    path=IntezerApi.get_strings_by_id(
+                    self=self, composed_analysis_id=analysis_id, sub_analysis_id=sub_analysis_id
+                    )['result_url']
+                )
+                return results.json()
+
+            except ConnectionError as e:
+                if not logged:
+                    self.log.error(
+                        "The intezer web service is most likely down. "
+                        f"Indicator: Unable to get sub_analyses strings for analysis ID {analysis_id} due to '{e}'."
+                    )
+                    logged = True
+                if self.retry_forever:
+                    sleep(5)
+                    continue
+                else:
+                    raise
+            except HTTPError as e:
+                self.log.debug(f"Unable to get sub_analyses strings for analysis ID {analysis_id} due to '{e}'.")
+                return None
+
     # Overriding the class method to handle if the network connection cannot be made
     def get_sub_analysis_metadata_by_id(self, analysis_id: str, sub_analysis_id: str) -> Dict[str, Any]:
         # We will try to connect with the REST API... NO MATTER WHAT
@@ -763,6 +793,84 @@ class Intezer(ServiceBase):
 
         return details
 
+    @staticmethod
+    def _process_strings(strings, parent_section: ResultSection):
+
+        families = []
+        family_count = []
+        string_list = []
+        family_type = []
+
+        for string in strings:
+            if "families" in string:
+                if string['families'][0]['family_name'] in families:
+                    index = families.index(string['families'][0]['family_name'])
+                    family_count[index] += 1
+                    string_list[index].append(string['string_value'])
+                else:
+                    families.append(string['families'][0]['family_name'])
+                    family_count.append(1)
+                    string_list.append([string['string_value']])
+            else:
+                if string['software_type'] in families:
+                    index = families.index(string['software_type'])
+                    family_count[index] += 1
+                    string_list[index].append(string['string_value'])
+                else:
+                    families.append(string['software_type'])
+                    family_count.append(1)
+                    string_list.append([string['string_value']])
+            if string['software_type'] in family_type:
+                continue
+            else:
+                family_type.append(string['software_type'])
+
+        paired = list(zip(families, family_count))
+        paired.sort(key=lambda x: x[0])
+        sorted_families, sorted_family_count = zip(*paired)
+        sorted_families = list(sorted_families)
+        sorted_family_count = list(sorted_family_count)
+
+        string_family_table = ResultTableSection("String Family Count")
+        string_family_table.set_column_order(["Family Name", "String Count"])
+
+        for i in range(len(families)):
+            if sorted_families[i] == "common": continue
+            row = {
+                "Family Name": sorted_families[i],
+                "String Count": sorted_family_count[i]
+            }
+            string_family_table.add_row(TableRow(row))
+        string_family_table.set_heuristic(21)
+
+        for type in family_type:
+            if type == "common": continue
+            family_section = ResultTableSection("String Family: " + type, auto_collapse=True)
+            family_section.set_column_order(["String Value", "Families", "Tags"])
+            family_section.set_heuristic(21)
+            for string in strings:
+                if string['software_type'] == type:
+                    tag_str = ""
+                    families_str = ""
+                    if string.get("tags"):
+                        for tags in string["tags"]:
+                            tag_str = tag_str + tags + ", "
+                        tag_str = tag_str.rstrip(", ")
+                    if string.get("families"):
+                        for family in string['families']:
+                            families_str = families_str + family["family_name"] + ", "
+                    else:
+                        families_str = string['software_type']
+                    families_str = families_str.rstrip(", ")
+                    entry = {
+                        "String Value": string['string_value'],
+                        "Families": families_str,
+                        "Tags": tag_str
+                    }
+                    family_section.add_row(TableRow(entry))
+            string_family_table.add_subsection(family_section)
+        parent_section.add_subsection(string_family_table)
+
     def _set_heuristic_by_verdict(self, result_section: ResultSection, verdict: Optional[str]) -> None:
         """
         This method sets the heuristic of the result section based on the verdict
@@ -990,6 +1098,7 @@ class Intezer(ServiceBase):
                 extraction_info = None
 
             code_reuse = self.client.get_sub_analysis_code_reuse_by_id(analysis_id, sub_analysis_id)
+            malicious_strings = self.client.get_sub_analysis_strings_by_id(analysis_id, sub_analysis_id)
 
             if code_reuse:
                 families = code_reuse.pop("families", [])
@@ -1024,6 +1133,9 @@ class Intezer(ServiceBase):
             processed_subanalysis = self._process_details(metadata.copy(), RELEVANT_DETAILS)
             intezer_result.update_items(processed_subanalysis)
 
+            if malicious_strings:
+                self._process_strings(malicious_strings['result']['strings'], sub_kv_section)
+
             if code_reuse:
                 code_reuse_kv_section = ResultKeyValueSection("Code reuse detected")
                 code_reuse_kv_section.update_items(code_reuse)
@@ -1033,7 +1145,7 @@ class Intezer(ServiceBase):
                 total_genes = code_reuse["gene_count"]
 
             sub_sha256 = sub["sha256"]
-            
+
             if families:
                 self._process_families(families, sub_sha256, file_verdict_map, sub_kv_section, total_genes)
 
