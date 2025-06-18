@@ -33,8 +33,8 @@ from intezer_sdk.api import IntezerApi
 from intezer_sdk.consts import API_VERSION, BASE_URL, AnalysisStatusCode, OnPremiseVersion
 from intezer_sdk.errors import InsufficientQuotaError, ServerError, UnsupportedOnPremiseVersion
 from requests import ConnectionError, HTTPError
-from safe_families import SAFE_FAMILIES
-from signatures import GENERIC_HEURISTIC_ID, get_attack_ids_for_signature_name, get_heur_id_for_signature_name
+from intezer.safe_families import SAFE_FAMILIES
+from intezer.signatures import GENERIC_HEURISTIC_ID, get_attack_ids_for_signature_name, get_heur_id_for_signature_name
 
 global_safelist: Optional[Dict[str, Dict[str, List[str]]]] = None
 
@@ -1033,7 +1033,7 @@ class Intezer(ServiceBase):
                 total_genes = code_reuse["gene_count"]
 
             sub_sha256 = sub["sha256"]
-            
+
             if families:
                 self._process_families(families, sub_sha256, file_verdict_map, sub_kv_section, total_genes)
 

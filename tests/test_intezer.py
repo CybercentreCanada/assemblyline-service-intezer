@@ -20,7 +20,7 @@ from assemblyline_v4_service.common.result import (
     TableRow,
 )
 from assemblyline_v4_service.common.task import Task
-from intezer import CANNOT_EXTRACT_ARCHIVE, ALIntezerApi, Intezer
+from intezer.intezer import CANNOT_EXTRACT_ARCHIVE, ALIntezerApi, Intezer
 from intezer_sdk.api import IntezerApi
 from intezer_sdk.errors import InsufficientQuotaError, ServerError, UnsupportedOnPremiseVersion
 from requests import ConnectionError, HTTPError
@@ -255,7 +255,7 @@ class TestIntezer:
             ALIntezerApi, "get_file_analysis_response", return_value=dummy_get_response_class("succeeded")
         )
         mocker.patch.object(ALIntezerApi, "get_latest_analysis", return_value={})
-        mocker.patch("intezer.sleep")
+        mocker.patch("intezer.intezer.sleep")
         assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
 
         mocker.patch.object(ALIntezerApi, "get_file_analysis_response", return_value=dummy_get_response_class("failed"))
@@ -280,7 +280,7 @@ class TestIntezer:
         with pytest.raises(NonRecoverableError):
             intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah")
 
-        mocker.patch("intezer.time", return_value=float("inf"))
+        mocker.patch("intezer.intezer.time", return_value=float("inf"))
         assert intezer_class_instance._submit_file_for_analysis(dummy_request_class_instance, "blah") == {}
 
     @staticmethod
