@@ -363,6 +363,7 @@ class ALIntezerApi(IntezerApi):
         logged = False
         while True:
             try:
+                #Fetch String analysis results from the Intezer API
                 results = IntezerApi.request_with_refresh_expired_access_token(
                     self=self,
                     method="GET",
@@ -795,12 +796,16 @@ class Intezer(ServiceBase):
 
     @staticmethod
     def _process_strings(strings, parent_section: ResultSection):
+        #Format String results into tables
+        #Families: Specific malware strain or codebase
+        #Family Type: General category/classification of malware
 
         families = []
         family_count = []
         string_list = []
         family_type = []
 
+        #Create lists of strings along with categories and counts for each category
         for string in strings:
             if "families" in string:
                 if string['families'][0]['family_name'] in families:
@@ -843,6 +848,7 @@ class Intezer(ServiceBase):
             string_family_table.add_row(TableRow(row))
         string_family_table.set_heuristic(21)
 
+        #Create sub tables for each category of malware and display the strings and family
         for type in family_type:
             if type == "common": continue
             family_section = ResultTableSection("String Family: " + type, auto_collapse=True)
