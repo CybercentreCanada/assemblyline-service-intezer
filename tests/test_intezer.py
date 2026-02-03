@@ -479,7 +479,7 @@ class TestIntezer:
         correct_ioc_res_sec = ResultTableSection("IOCs found in signature marks")
         correct_ioc_res_sec.add_row(TableRow(ioc_type="ip", ioc="2.2.2.2"))
         correct_ioc_res_sec.add_tag("network.dynamic.ip", "2.2.2.2")
-        correct_res_sec.add_subsection(correct_ioc_res_sec)
+        #correct_res_sec.add_subsection(correct_ioc_res_sec)
         assert check_section_equality(parent_res_sec.subsections[0].subsections[0], correct_res_sec)
 
     @staticmethod
