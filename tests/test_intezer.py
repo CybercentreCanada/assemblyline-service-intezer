@@ -1,7 +1,7 @@
 import os
 import shutil
 from logging import DEBUG, getLogger
-from multiprocessing import Process
+from multiprocessing import Process, set_start_method
 
 import pytest
 import requests_mock
@@ -20,10 +20,18 @@ from assemblyline_v4_service.common.result import (
     TableRow,
 )
 from assemblyline_v4_service.common.task import Task
-from intezer.intezer import CANNOT_EXTRACT_ARCHIVE, ALIntezerApi, Intezer
 from intezer_sdk.api import IntezerApi
-from intezer_sdk.errors import InsufficientQuotaError, ServerError, UnsupportedOnPremiseVersion
+from intezer_sdk.errors import (
+    InsufficientQuotaError,
+    ServerError,
+    UnsupportedOnPremiseVersion,
+)
 from requests import ConnectionError, HTTPError
+
+from intezer.intezer import CANNOT_EXTRACT_ARCHIVE, ALIntezerApi, Intezer
+
+# Set start method for multiprocessing to default to "fork" (instead of "forkserver" default in 3.14)
+set_start_method("fork")
 
 # Getting absolute paths, names and regexes
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -743,7 +751,7 @@ class TestIntezer:
         command_line_set = set()
         correct_processes = [
             {
-                "start_time": "1-01-01 00:00:00.000000",
+                "start_time": "0001-01-01 00:00:00.000000",
                 "end_time": "9999-12-31 23:59:59.999999",
                 "objectid": {
                     "ontology_id": "process_FgezEeHOzrsPT9RyqA3MZ",
@@ -753,7 +761,7 @@ class TestIntezer:
                     "tag": "blah.exe",
                     "treeid": None,
                     "processtree": None,
-                    "time_observed": "1-01-01 00:00:00.000000",
+                    "time_observed": "0001-01-01 00:00:00.000000",
                 },
                 "pobjectid": {
                     "ontology_id": "process_3gQblYLmzfdmdQEWr6IOAw",
@@ -761,7 +769,7 @@ class TestIntezer:
                     "service_name": "IntezerStatic",
                     "session": None,
                     "tag": "blah3.exe",
-                    "time_observed": "1-01-01 00:00:00.000000",
+                    "time_observed": "0001-01-01 00:00:00.000000",
                     "treeid": None,
                 },
                 "pimage": "blah3.exe",
@@ -777,7 +785,7 @@ class TestIntezer:
                 "original_file_name": None,
             },
             {
-                "start_time": "1-01-01 00:00:00.000000",
+                "start_time": "0001-01-01 00:00:00.000000",
                 "end_time": "9999-12-31 23:59:59.999999",
                 "objectid": {
                     "ontology_id": "process_3mkF9MLqHlxJQCAG7ViEOu",
@@ -787,7 +795,7 @@ class TestIntezer:
                     "tag": "blah2.exe",
                     "treeid": None,
                     "processtree": None,
-                    "time_observed": "1-01-01 00:00:00.000000",
+                    "time_observed": "0001-01-01 00:00:00.000000",
                 },
                 "pobjectid": {
                     "ontology_id": "process_3gQblYLmzfdmdQEWr6IOAw",
@@ -795,7 +803,7 @@ class TestIntezer:
                     "service_name": "IntezerStatic",
                     "session": None,
                     "tag": "blah3.exe",
-                    "time_observed": "1-01-01 00:00:00.000000",
+                    "time_observed": "0001-01-01 00:00:00.000000",
                     "treeid": None,
                 },
                 "pimage": "blah3.exe",
@@ -811,7 +819,7 @@ class TestIntezer:
                 "original_file_name": None,
             },
             {
-                "start_time": "1-01-01 00:00:00.000000",
+                "start_time": "0001-01-01 00:00:00.000000",
                 "end_time": "9999-12-31 23:59:59.999999",
                 "objectid": {
                     "ontology_id": "process_3gQblYLmzfdmdQEWr6IOAw",
@@ -821,7 +829,7 @@ class TestIntezer:
                     "tag": "blah3.exe",
                     "treeid": None,
                     "processtree": None,
-                    "time_observed": "1-01-01 00:00:00.000000",
+                    "time_observed": "0001-01-01 00:00:00.000000",
                 },
                 "pobjectid": None,
                 "pimage": None,
